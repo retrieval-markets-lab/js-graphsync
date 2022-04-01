@@ -1,0 +1,31 @@
+{
+  "private": true,
+  "name": "graphsync-examples",
+  "version": "1.0.0",
+  "description": "Web app running examples of graphsync operations",
+  "main": "src/index.ts",
+  "license": "MIT",
+  "scripts": {
+    "start": "node serve.js"
+  },
+  "devDependencies": {
+    "@types/react": "^17.0.39",
+    "@types/react-dom": "^17.0.11",
+    "esbuild": "^0.14.29",
+    "prettier": "^2.5.1"
+  },
+  "dependencies": {
+    "@chainsafe/libp2p-noise": "5.0.0",
+    "@dcdn/cachestore": "^0.0.1",
+    "@dcdn/graphsync": "file:..",
+    "buffer": "^6.0.3",
+    "libp2p": "^0.35.8",
+    "libp2p-interfaces": "^2.0.1",
+    "libp2p-mplex": "^0.10.5",
+    "libp2p-websockets": "^0.16.2",
+    "multiaddr": "^10.0.1",
+    "multiformats": "^9.6.4",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2"
+  }
+}

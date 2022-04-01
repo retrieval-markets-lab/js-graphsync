@@ -1,0 +1,10 @@
+.DS_STORE
+node_modules
+build/
+*.swp
+*.swo
+dist
+package-lock.json
+tsconfig-types.aegir.json
+yarn.lock
+**/*.log
