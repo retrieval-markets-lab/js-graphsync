@@ -1,5 +1,8 @@
 # GraphSync
 
+![](https://img.shields.io/badge/made%20by-Myel-blue)
+![](https://img.shields.io/github/license/myelnet/js-graphsync?color=green)
+
 > JS implementation of the GraphSync v2 wire protocol.
 
 ## Background
