@@ -1,3 +1,3 @@
 export * from "./traversal";
 export {GraphSync, Request} from "./graphsync";
-export {fetch} from "./resolver";
+export {fetch, unixfsPathSelector} from "./resolver";

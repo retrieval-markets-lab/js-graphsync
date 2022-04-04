@@ -1,4 +1,10 @@
-import {LinkLoader, Blockstore, blockFromStore} from "./traversal";
+import {
+  LinkLoader,
+  Blockstore,
+  blockFromStore,
+  KnownReifiers,
+  NodeReifier,
+} from "./traversal";
 import type {Block} from "multiformats/block";
 import type {CID} from "multiformats";
 
@@ -21,6 +27,8 @@ export class AsyncLoader implements LinkLoader {
   loaded: Set<string> = new Set();
 
   pullQueue: Map<string, Resolvable[]> = new Map();
+
+  reifiers: KnownReifiers = {};
 
   constructor(store: Blockstore, tracker?: BlockNotifyFn) {
     this.store = store;
@@ -78,6 +86,9 @@ export class AsyncLoader implements LinkLoader {
         .put(blk.cid, new Uint8Array(blk.bytes))
         .then(() => this.pending.delete(blk.cid.toString()));
     }
+  }
+  reifier(name: string): NodeReifier {
+    return this.reifiers[name];
   }
   // cleanup any block in memory
   close() {

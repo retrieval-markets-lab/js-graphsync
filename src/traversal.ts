@@ -3,6 +3,7 @@ import {Block, encode as encodeBlock} from "multiformats/block";
 import * as dagCBOR from "@ipld/dag-cbor";
 import {sha256} from "multiformats/hashes/sha2";
 import {decode as decodePb} from "@ipld/dag-pb";
+import {UnixFS} from "ipfs-unixfs";
 import type {Store} from "interface-store";
 
 export interface Blockstore extends Store<CID, Uint8Array> {}
@@ -33,16 +34,23 @@ export async function blockFromStore(
 
 export class LinkSystem implements LinkLoader {
   store: Blockstore;
-  constructor(store: Blockstore) {
+  reifiers: KnownReifiers = {};
+  constructor(store: Blockstore, reifiers?: KnownReifiers) {
     this.store = store;
+    if (reifiers) {
+      this.reifiers = reifiers;
+    }
   }
   load(cid: CID): Promise<Block<any>> {
     return blockFromStore(cid, this.store);
   }
+  reifier(name: string): NodeReifier | undefined {
+    return this.reifiers[name];
+  }
   close() {}
 }
 
-enum Kind {
+export enum Kind {
   Invalid = "",
   Map = "{",
   List = "[",
@@ -150,7 +158,10 @@ export class Node {
 
 export type SelectorNode = {
   // Matcher
-  "."?: SelectorNode;
+  "."?: {
+    "["?: number;
+    "]"?: number;
+  };
   // ExploreAll
   a?: {
     ">": SelectorNode; // Next
@@ -178,6 +189,12 @@ export type SelectorNode = {
     l: LimitNode;
     // Sequence
     ":>"?: SelectorNode;
+  };
+  "~"?: {
+    // adl
+    as: string;
+    // Next
+    ">": SelectorNode;
   };
   "|"?: SelectorNode; // ExploreUnion
   "&"?: SelectorNode; // ExploreConditional | Condition
@@ -256,6 +273,12 @@ export function parseContext() {
           return this.parseExploreAll(node[key]);
         case "@":
           return this.parseExploreRecursiveEdge(node[key]);
+        case "f":
+          return this.parseExploreFields(node[key]);
+        case "~":
+          return this.parseExploreInterpretAs(node[key]);
+        case ".":
+          return this.parseMatcher(node[key]);
         default:
           throw new Error("unknown selector");
       }
@@ -287,6 +310,25 @@ export function parseContext() {
       const selector = this.parseSelector(next);
       return new ExploreAll(selector);
     },
+    parseExploreFields(node: any): Selector {
+      const fields: {[key: string]: SelectorNode} = node["f>"];
+      const selections: {[key: string]: Selector} = {};
+      const interests: PathSegment[] = [];
+      for (const [key, value] of Object.entries(fields)) {
+        interests.push(new PathSegment(key));
+        selections[key] = this.parseSelector(value);
+      }
+      return new ExploreFields(selections, interests);
+    },
+    parseExploreInterpretAs(node: any): Selector {
+      const adl = node["as"];
+      const next: SelectorNode = node[">"];
+      const selector = this.parseSelector(next);
+      return new ExploreInterpretAs(adl, selector);
+    },
+    parseMatcher(node: any): Selector {
+      return new Matcher();
+    },
   };
 }
 
@@ -316,7 +358,7 @@ type RecursionLimit = {
   depth: number;
 };
 
-class ExploreAll implements Selector {
+export class ExploreAll implements Selector {
   next: Selector;
   constructor(next: Selector) {
     this.next = next;
@@ -332,7 +374,7 @@ class ExploreAll implements Selector {
   }
 }
 
-class ExploreRecursiveEdge implements Selector {
+export class ExploreRecursiveEdge implements Selector {
   interests(): PathSegment[] {
     throw new Error("Traversed Explore Recursive Edge Node With No Parent");
   }
@@ -341,6 +383,54 @@ class ExploreRecursiveEdge implements Selector {
   }
   decide(node: any): boolean {
     throw new Error("Traversed Explore Recursive Edge Node With No Parent");
+  }
+}
+
+export class ExploreFields implements Selector {
+  selections: {[key: string]: Selector};
+  _interests: PathSegment[];
+  constructor(selections: {[key: string]: Selector}, interests: PathSegment[]) {
+    this.selections = selections;
+    this._interests = interests;
+  }
+  interests(): PathSegment[] {
+    return this._interests;
+  }
+  explore(node: any, path: PathSegment): Selector | null {
+    return this.selections[path.toString()] ?? null;
+  }
+  decide(node: any): boolean {
+    return false;
+  }
+}
+
+export class ExploreInterpretAs implements Selector {
+  next: Selector;
+  adl: string;
+  constructor(adl: string, next: Selector) {
+    this.adl = adl;
+    this.next = next;
+  }
+  interests(): PathSegment[] {
+    return this.next.interests();
+  }
+  explore(node: any, path: PathSegment): Selector | null {
+    return this.next;
+  }
+  decide(node: any): boolean {
+    return false;
+  }
+}
+
+export class Matcher implements Selector {
+  interests(): PathSegment[] {
+    return [];
+  }
+  explore(node: any, path: PathSegment): Selector | null {
+    return null;
+  }
+  decide(node: any): boolean {
+    return true;
   }
 }
 
@@ -490,8 +580,35 @@ function mapIterator(node: {[key: string]: any}) {
   };
 }
 
+export type NodeReifier = (node: Node, loader: LinkLoader) => Node;
+
+export type KnownReifiers = {[key: string]: NodeReifier};
+
+export function unixfsReifier(node: Node, loader: LinkLoader): Node {
+  if (
+    node.kind == Kind.Map &&
+    node.value.Data &&
+    node.value.Links?.length > 0
+  ) {
+    try {
+      const unixfs = UnixFS.unmarshal(node.value.Data);
+      if (unixfs.isDirectory()) {
+        const dir: {[key: string]: Node} = {};
+        for (const link of node.value.Links) {
+          dir[link.Name] = new Node(link.Hash);
+        }
+        return new Node(dir);
+      }
+    } catch (e) {
+      return node;
+    }
+  }
+  return node;
+}
+
 export interface LinkLoader {
   load(cid: CID): Promise<Block<any>>;
+  reifier(name: string): NodeReifier | undefined;
   close(): void;
 }
 
@@ -507,6 +624,18 @@ export async function* walkBlocks(
     yield blk;
 
     nd = new Node(blk.value);
+  }
+
+  if (sel instanceof ExploreInterpretAs) {
+    const reify = source.reifier(sel.adl);
+    if (reify) {
+      const rnd = reify(nd, source);
+      const next = sel.explore(nd, new PathSegment(""));
+      if (next) {
+        sel = next;
+      }
+      nd = rnd;
+    }
   }
 
   // if this block has no links we should be done
