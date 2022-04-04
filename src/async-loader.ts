@@ -15,11 +15,15 @@ interface Resolvable {
 
 export type BlockNotifyFn = (block: Block<any>) => void;
 
+export type WaitNotifyFn = (cid: CID) => void;
+
 // AsyncLoader waits for a block to be anounced if it is not available in the blockstore
 export class AsyncLoader implements LinkLoader {
   store: Blockstore;
   // notify callback everytime a new block is loaded
   tracker?: BlockNotifyFn;
+  // notify callback when the loader is waiting for a bock
+  waitNotify?: WaitNotifyFn;
   // pending are block that have been pushed but not yet loaded
   pending: Map<string, Block<any>> = new Map();
   // loaded is a set of string CIDs for content that was loaded.
@@ -30,9 +34,18 @@ export class AsyncLoader implements LinkLoader {
 
   reifiers: KnownReifiers = {};
 
-  constructor(store: Blockstore, tracker?: BlockNotifyFn) {
+  notifyWaiting = false;
+
+  constructor(
+    store: Blockstore,
+    tracker?: BlockNotifyFn,
+    waitNotify?: WaitNotifyFn
+  ) {
     this.store = store;
     this.tracker = tracker;
+    if (waitNotify) {
+      this.setWaitNotify(waitNotify);
+    }
   }
   async load(cid: CID): Promise<Block<any>> {
     const k = cid.toString();
@@ -52,6 +65,8 @@ export class AsyncLoader implements LinkLoader {
       this.loaded.add(k);
     }
   }
+  // waitForBlock will queue up a promise that will get resolved once a block
+  // is pushed to the loader.
   async waitForBlock(cid: CID): Promise<Block<any>> {
     const block = this.pending.get(cid.toString());
     if (block) {
@@ -59,6 +74,10 @@ export class AsyncLoader implements LinkLoader {
     }
     if (this.loaded.has(cid.toString())) {
       return blockFromStore(cid, this.store);
+    }
+
+    if (this.waitNotify && this.notifyWaiting) {
+      this.waitNotify(cid);
     }
 
     return new Promise((resolve, reject) => {
@@ -79,6 +98,7 @@ export class AsyncLoader implements LinkLoader {
       this.pending.set(k, block);
     }
   }
+  // move a pending block to the blockstore.
   flush(blk: Block<any>) {
     if (!this.loaded.has(blk.cid.toString())) {
       this.tracker?.(blk);
@@ -93,5 +113,10 @@ export class AsyncLoader implements LinkLoader {
   // cleanup any block in memory
   close() {
     this.pending = new Map();
+  }
+
+  setWaitNotify(cb: WaitNotifyFn) {
+    this.waitNotify = cb;
+    this.notifyWaiting = true;
   }
 }

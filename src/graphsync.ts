@@ -127,12 +127,15 @@ export class Request extends EventEmitter {
     this.loader = new AsyncLoader(blocks, this.incomingBlockHook.bind(this));
   }
 
-  async open(peer: PeerId, extensions?: {[key: string]: any}) {
-    const {stream} = await this.dialer.dialProtocol(peer, PROTOCOL);
-    await pipe(
-      [newRequest(this.id, this.root, this.selector, extensions)],
-      stream
-    );
+  open(peer: PeerId, extensions?: {[key: string]: any}) {
+    this.loader.setWaitNotify(async () => {
+      this.loader.notifyWaiting = false;
+      const {stream} = await this.dialer.dialProtocol(peer, PROTOCOL);
+      await pipe(
+        [newRequest(this.id, this.root, this.selector, extensions)],
+        stream
+      );
+    });
   }
 
   async drain() {

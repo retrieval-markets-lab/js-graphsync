@@ -17,6 +17,8 @@
     "aegir": "^36.2.3",
     "blockstore-core": "^1.0.5",
     "ipfs-unixfs-importer": "^9.0.6",
+    "it-pair": "^1.0.0",
+    "libp2p-interfaces": "^2.0.1",
     "prettier": "^2.6.1"
   },
   "dependencies": {
