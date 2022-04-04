@@ -1,10 +1,15 @@
 import {CID} from "multiformats";
 import {UnixFS} from "ipfs-unixfs";
-import * as dagJSON from "multiformats/codecs/json";
-import type {PBLink} from "@ipld/dag-pb";
 import PeerId from "peer-id";
 import type {Multiaddr} from "multiaddr";
-import {allSelector, Node, parseContext, walkBlocks} from "./traversal";
+import {
+  allSelector,
+  Node,
+  Kind,
+  parseContext,
+  walkBlocks,
+  SelectorNode,
+} from "./traversal";
 import mime from "mime/lite";
 import type {GraphSync} from "./graphsync";
 
@@ -19,9 +24,35 @@ export function parsePath(path: string): {root: CID; segments: string[]} {
   const comps = toPathComponents(path);
   const root = CID.parse(comps[0]);
   return {
-    segments: comps,
+    segments: comps.slice(1),
     root,
   };
+}
+
+export function unixfsPathSelector(path: string): {
+  root: CID;
+  selector: SelectorNode;
+} {
+  const {root, segments} = parsePath(path);
+  let selector = allSelector;
+  if (segments.length === 0) {
+    return {root, selector};
+  }
+  for (let i = segments.length - 1; i >= 0; i--) {
+    selector = {
+      "~": {
+        as: "unixfs",
+        ">": {
+          f: {
+            "f>": {
+              [segments[i]]: selector,
+            },
+          },
+        },
+      },
+    };
+  }
+  return {root, selector};
 }
 
 export function getPeerID(addr: Multiaddr): PeerId {
@@ -39,17 +70,14 @@ export async function* resolve(
   provider: Multiaddr,
   exchange: GraphSync
 ): AsyncIterable<any> {
-  const {segments, root} = parsePath(path);
-  let cid = root;
-  let segs = segments.slice(1);
-  const sel = allSelector;
+  const {root, selector: sel} = unixfsPathSelector(path);
   const pid = getPeerID(provider);
   exchange.network.peerStore.addressBook.add(pid, [provider]);
-  const request = exchange.request(cid, sel);
+  const request = exchange.request(root, sel);
   const id = Date.now();
   const voucher = {
     ID: id,
-    PayloadCID: cid,
+    PayloadCID: root,
     Params: {
       Selector: sel,
       PieceCID: null,
@@ -63,7 +91,7 @@ export async function* resolve(
     [EXTENSION]: {
       IsRq: true,
       Request: {
-        BCid: cid,
+        BCid: root,
         Type: 0,
         Pull: true,
         Paus: false,
@@ -78,7 +106,7 @@ export async function* resolve(
     },
   });
   for await (const blk of walkBlocks(
-    new Node(cid),
+    new Node(root),
     parseContext().parseSelector(sel),
     request
   )) {
@@ -88,46 +116,22 @@ export async function* resolve(
       case 0x71:
         break;
       default:
-        console.log("raw bytes");
         yield blk.bytes;
         continue;
     }
-    try {
-      const unixfs = UnixFS.unmarshal(blk.value.Data);
-      if (unixfs.isDirectory()) {
-        // if it's a directory and we have a segment to resolve, identify the link
-        if (segs.length > 0) {
-          for (const link of blk.value.Links) {
-            if (link.Name === segs[0]) {
-              cid = link.Hash;
-              segs = segs.slice(1);
-              console.log("found link in directory");
-              continue;
-            }
+    if (blk.value.kind === Kind.Map && blk.value.Data) {
+      try {
+        const unixfs = UnixFS.unmarshal(blk.value.Data);
+        if (unixfs.type === "file") {
+          if (unixfs.data && unixfs.data.length) {
+            yield unixfs.data;
           }
-          throw new Error("key not found: " + segs[0]);
-        } else {
-          // if the block is a directory and we have no key return the entries as JSON
-          yield dagJSON.encode(
-            blk.value.Links.map((l: PBLink) => ({
-              name: l.Name,
-              hash: l.Hash.toString(),
-              size: l.Tsize,
-            }))
-          );
-          break;
+          continue;
         }
-      }
-      if (unixfs.type === "file") {
-        if (unixfs.data && unixfs.data.length) {
-          console.log("unixfs file");
-          yield unixfs.data;
-        }
-        continue;
-      }
-    } catch (e) {}
-    // we're outside of unixfs territory
-    // ignore
+      } catch (e) {}
+      // we're outside of unixfs territory
+      // ignore
+    }
   }
   // tell the loader we're done receiving blocks for this traversal
   request.close();

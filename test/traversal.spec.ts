@@ -3,6 +3,7 @@ import {encode} from "multiformats/block";
 import * as dagCBOR from "@ipld/dag-cbor";
 import {MemoryBlockstore} from "blockstore-core/memory";
 import {sha256} from "multiformats/hashes/sha2";
+import {importer} from "ipfs-unixfs-importer";
 import {
   Node,
   allSelector,
@@ -10,7 +11,9 @@ import {
   LinkSystem,
   walkBlocks,
   ExploreRecursive,
+  unixfsReifier,
 } from "../src/traversal";
+import {unixfsPathSelector} from "../src/resolver";
 
 describe("traversal", () => {
   it("walk blocks", async () => {
@@ -112,5 +115,79 @@ describe("traversal", () => {
       i++;
     }
     expect(i).to.equal(12);
+  });
+  it("traverse unixfs path", async () => {
+    const bs = new MemoryBlockstore();
+
+    const first = new Uint8Array(5 * 256);
+    const second = new Uint8Array(3 * 256);
+    const third = new Uint8Array(2 * 256);
+    const forth = new Uint8Array(4 * 256);
+
+    // chunk and dagify it then get the root cid
+    let cid;
+    for await (const chunk of importer(
+      [
+        {path: "first", content: first},
+        {path: "second", content: second},
+        {path: "/children/third", content: third},
+        {path: "/children/forth", content: forth},
+      ],
+      bs,
+      {
+        cidVersion: 1,
+        maxChunkSize: 256,
+        rawLeaves: true,
+        wrapWithDirectory: true,
+      }
+    )) {
+      if (chunk.path === "") {
+        cid = chunk.cid;
+      }
+    }
+
+    const source = new LinkSystem(bs, {unixfs: unixfsReifier});
+
+    const {root, selector} = unixfsPathSelector(cid?.toString() + "/second");
+
+    let sel = parseContext().parseSelector(selector);
+
+    let expected = [
+      root.toString(),
+      "bafybeihn4abm7nqsx3l3efwgdto6aqbbz3sduyiguhshypgzwp5i4hq2x4",
+      "bafkreictihtlezdjpgtq4v3fgad2d4yqc2kcd3e33wpruvsi65nn4ac26e",
+      "bafkreictihtlezdjpgtq4v3fgad2d4yqc2kcd3e33wpruvsi65nn4ac26e",
+      "bafkreictihtlezdjpgtq4v3fgad2d4yqc2kcd3e33wpruvsi65nn4ac26e",
+    ];
+
+    let i = 0;
+
+    for await (const blk of walkBlocks(new Node(root), sel, source)) {
+      expect(blk.cid.toString()).to.equal(expected[i]);
+      i++;
+    }
+    expect(i).to.equal(expected.length);
+
+    const {root: root2, selector: selector2} = unixfsPathSelector(
+      cid?.toString() + "/children/third"
+    );
+
+    sel = parseContext().parseSelector(selector2);
+
+    expected = [
+      root2.toString(),
+      "bafybeiepvdqmdakhtwotvykxujrmt5fcq4xca5jmoo6wzxhjk3q3pqe4te",
+      "bafybeiadbpihdettqvip2z42x4hviblexbu3r364n6owtimuuzxwkmuyqy",
+      "bafkreictihtlezdjpgtq4v3fgad2d4yqc2kcd3e33wpruvsi65nn4ac26e",
+      "bafkreictihtlezdjpgtq4v3fgad2d4yqc2kcd3e33wpruvsi65nn4ac26e",
+    ];
+
+    i = 0;
+
+    for await (const blk of walkBlocks(new Node(root2), sel, source)) {
+      expect(blk.cid.toString()).to.equal(expected[i]);
+      i++;
+    }
+    expect(i).to.equal(expected.length);
   });
 });

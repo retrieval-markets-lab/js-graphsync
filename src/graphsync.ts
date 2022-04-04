@@ -21,8 +21,13 @@ import {
   decodeMessage,
   newRequest,
 } from "./messages";
-import type {SelectorNode, Blockstore} from "./traversal";
-import {Node, walkBlocks, parseContext} from "./traversal";
+import type {
+  SelectorNode,
+  Blockstore,
+  KnownReifiers,
+  NodeReifier,
+} from "./traversal";
+import {Node, walkBlocks, parseContext, unixfsReifier} from "./traversal";
 
 export class GraphSync {
   started = false;
@@ -102,6 +107,10 @@ export class Request extends EventEmitter {
   dialer: ProtocolDialer;
   loader: AsyncLoader;
 
+  reifiers: KnownReifiers = {
+    unixfs: unixfsReifier,
+  };
+
   constructor(
     id: string,
     root: CID,
@@ -134,6 +143,10 @@ export class Request extends EventEmitter {
         this
       )
     );
+  }
+
+  reifier(name: string): NodeReifier {
+    return this.reifiers[name];
   }
 
   // TODO
