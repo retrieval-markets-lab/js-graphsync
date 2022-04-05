@@ -6,6 +6,7 @@ import {
   allSelector,
   Node,
   Kind,
+  LinkLoader,
   parseContext,
   walkBlocks,
   SelectorNode,
@@ -65,12 +66,52 @@ export function getPeerID(addr: Multiaddr): PeerId {
   return PeerId.createFromB58String(parts[idx]);
 }
 
+// Iterate an IPLD traversal and resolve UnixFS blocks
 export async function* resolve(
-  path: string,
-  provider: Multiaddr,
-  exchange: GraphSync
-): AsyncIterable<any> {
-  const {root, selector: sel} = unixfsPathSelector(path);
+  root: CID,
+  selector: SelectorNode,
+  loader: LinkLoader
+): AsyncIterable<Uint8Array> {
+  for await (const blk of walkBlocks(
+    new Node(root),
+    parseContext().parseSelector(selector),
+    loader
+  )) {
+    // if not cbor or dagpb just return the bytes
+    switch (blk.cid.code) {
+      case 0x70:
+      case 0x71:
+        break;
+      default:
+        yield blk.bytes;
+        continue;
+    }
+    if (blk.value.kind === Kind.Map && blk.value.Data) {
+      try {
+        const unixfs = UnixFS.unmarshal(blk.value.Data);
+        if (unixfs.type === "file") {
+          if (unixfs.data && unixfs.data.length) {
+            yield unixfs.data;
+          }
+          continue;
+        }
+      } catch (e) {}
+      // we're outside of unixfs territory
+      // ignore
+    }
+  }
+}
+
+type FetchInit = {
+  headers: {[key: string]: string};
+  provider: Multiaddr;
+  exchange: GraphSync;
+};
+
+export async function fetch(url: string, init: FetchInit): Promise<Response> {
+  const {headers, exchange, provider} = init;
+
+  const {root, selector: sel} = unixfsPathSelector(url);
   const pid = getPeerID(provider);
   exchange.network.peerStore.addressBook.add(pid, [provider]);
   const request = exchange.request(root, sel);
@@ -105,47 +146,8 @@ export async function* resolve(
       Response: null,
     },
   });
-  for await (const blk of walkBlocks(
-    new Node(root),
-    parseContext().parseSelector(sel),
-    request
-  )) {
-    // if not cbor or dagpb just return the bytes
-    switch (blk.cid.code) {
-      case 0x70:
-      case 0x71:
-        break;
-      default:
-        yield blk.bytes;
-        continue;
-    }
-    if (blk.value.kind === Kind.Map && blk.value.Data) {
-      try {
-        const unixfs = UnixFS.unmarshal(blk.value.Data);
-        if (unixfs.type === "file") {
-          if (unixfs.data && unixfs.data.length) {
-            yield unixfs.data;
-          }
-          continue;
-        }
-      } catch (e) {}
-      // we're outside of unixfs territory
-      // ignore
-    }
-  }
-  // tell the loader we're done receiving blocks for this traversal
-  request.close();
-}
 
-type FetchInit = {
-  headers: {[key: string]: string};
-  provider: Multiaddr;
-  exchange: GraphSync;
-};
-
-export async function fetch(url: string, init: FetchInit): Promise<Response> {
-  const {headers, exchange, provider} = init;
-  const content = resolve(url, provider, exchange);
+  const content = resolve(root, sel, request);
   const iterator = content[Symbol.asyncIterator]();
 
   try {
@@ -171,6 +173,7 @@ export async function fetch(url: string, init: FetchInit): Promise<Response> {
         console.log(e);
         writer.abort((e as Error).message);
       }
+      request.close();
     }
     write();
     return new Response(readable, {

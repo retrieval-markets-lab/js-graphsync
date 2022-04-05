@@ -4,8 +4,7 @@ import {Buffer} from "buffer";
 import {parse as uuidParse} from "uuid";
 import * as dagCBOR from "@ipld/dag-cbor";
 import type BufferList from "bl/BufferList";
-// @ts-ignore (no types)
-import vd from "varint-decoder";
+import * as varint from "varint";
 import lp from "it-length-prefixed";
 import {SelectorNode, decoderFor} from "./traversal";
 
@@ -72,7 +71,7 @@ export const statuses = {
   [ResponseStatusCode.RequestCancelled]: "RequestCancelled",
 };
 
-enum GraphSyncLinkAction {
+export enum GraphSyncLinkAction {
   Present = "p",
   DuplicateNotSent = "d",
   Missing = "m",
@@ -86,7 +85,7 @@ type GraphSyncPriority = number;
 
 type GraphSyncMetadatum = [CID, GraphSyncLinkAction];
 
-type GraphSyncMetadata = GraphSyncMetadatum[];
+export type GraphSyncMetadata = GraphSyncMetadatum[];
 
 enum GraphSyncRequestType {
   New = "n",
@@ -114,13 +113,13 @@ export type GraphSyncResponse = {
   ext?: GraphSyncExtensions;
 };
 
-type GraphSyncMessage = {
+export type GraphSyncMessage = {
   req?: GraphSyncRequest[];
   rsp?: GraphSyncResponse[];
   blk?: GraphSyncBlock[];
 };
 
-type GraphSyncMessageRoot = {
+export type GraphSyncMessageRoot = {
   gs2: GraphSyncMessage;
 };
 
@@ -130,20 +129,21 @@ export function newRequest(
   sel: SelectorNode,
   ext?: GraphSyncExtensions
 ): BufferList {
+  const req: GraphSyncRequest = {
+    id: uuidParse(id) as Uint8Array,
+    type: GraphSyncRequestType.New,
+    pri: 0,
+    root,
+    sel,
+  };
+  if (ext) {
+    req.ext = ext;
+  }
   return lp.encode.single(
     new Buffer(
-      dagCBOR.encode({
+      dagCBOR.encode<GraphSyncMessageRoot>({
         gs2: {
-          requests: [
-            {
-              id: uuidParse(id),
-              type: GraphSyncRequestType.New,
-              pri: 0,
-              root,
-              sel,
-              ext,
-            },
-          ],
+          req: [req],
         },
       })
     )
@@ -158,10 +158,12 @@ export async function decodeBlock(
   block: GraphSyncBlock,
   hashers: {[key: number]: hasher.MultihashHasher<any>}
 ): Promise<Block<any>> {
-  const values = vd(block[0]);
-  const cidVersion = values[0];
-  const multicodec = values[1];
-  const multihash = values[2];
+  let offset = 0;
+  const cidVersion = varint.decode(block[0], offset) as any;
+  offset += varint.decode.bytes;
+  const multicodec = varint.decode(block[0], offset);
+  offset += varint.decode.bytes;
+  const multihash = varint.decode(block[0], offset);
   const hasher = hashers[multihash];
   if (!hasher) {
     throw new Error("Unsuported hasher");

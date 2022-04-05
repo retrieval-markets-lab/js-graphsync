@@ -7,6 +7,7 @@ import {EventEmitter} from "events";
 import pair from "it-pair";
 import type BufferList from "bl/BufferList";
 import drain from "it-drain";
+import {concat as concatUint8Arrays} from "uint8arrays/concat";
 
 class MockAddressBook {
   addrs: {[key: string]: Multiaddr[]} = {};
@@ -28,6 +29,8 @@ export class MockLibp2p {
   };
 
   sources: {[key: string]: AsyncIterable<BufferList>} = {};
+
+  openStreams: MuxedStream[] = [];
 
   constructor(peerId: PeerId) {
     this.peerId = peerId;
@@ -111,6 +114,8 @@ export class MockLibp2p {
     stream.close = () => {};
     stream.id = id;
 
+    this.openStreams.push(stream);
+
     const conn = {
       stream,
       protocol: typeof protocols === "string" ? protocols : protocols[0],
@@ -121,4 +126,19 @@ export class MockLibp2p {
     }
     return conn;
   }
+}
+
+export async function concatChunkIterator(
+  content: AsyncIterable<Uint8Array>
+): Promise<Uint8Array> {
+  const iterator = content[Symbol.asyncIterator]();
+  let {value, done} = await iterator.next();
+  let buf = value;
+  while (!done) {
+    ({value, done} = await iterator.next());
+    if (value) {
+      buf = concatUint8Arrays([buf, value], buf.length + value.length);
+    }
+  }
+  return buf;
 }

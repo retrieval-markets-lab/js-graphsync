@@ -17,6 +17,7 @@ import {
   PROTOCOL,
   GraphSyncBlock,
   decodeBlock,
+  GraphSyncRequest,
   GraphSyncResponse,
   decodeMessage,
   newRequest,
@@ -28,6 +29,7 @@ import type {
   NodeReifier,
 } from "./traversal";
 import {Node, walkBlocks, parseContext, unixfsReifier} from "./traversal";
+import {responseBuilder} from "./response-builder";
 
 export class GraphSync {
   started = false;
@@ -83,6 +85,10 @@ export class GraphSync {
       req.incomingResponseHook(resp);
     }
   }
+  async _handleRequest(peer: PeerId, req: GraphSyncRequest) {
+    const {stream} = await this.network.dialProtocol(peer, PROTOCOL);
+    await pipe(responseBuilder(req, this.blocks), lp.encode(), stream);
+  }
   async _handler(props: HandlerProps) {
     const source = props.stream.source as AsyncIterable<BufferList>;
     for await (const chunk of lp.decode()(source)) {
@@ -95,6 +101,11 @@ export class GraphSync {
       }
       if (msg.rsp) {
         msg.rsp.forEach((resp) => this._handleResponse(resp));
+      }
+      if (msg.req) {
+        msg.req.forEach((req) =>
+          this._handleRequest(props.connection.remotePeer, req)
+        );
       }
     }
   }
@@ -127,14 +138,21 @@ export class Request extends EventEmitter {
     this.loader = new AsyncLoader(blocks, this.incomingBlockHook.bind(this));
   }
 
-  open(peer: PeerId, extensions?: {[key: string]: any}) {
-    this.loader.setWaitNotify(async () => {
-      this.loader.notifyWaiting = false;
-      const {stream} = await this.dialer.dialProtocol(peer, PROTOCOL);
-      await pipe(
-        [newRequest(this.id, this.root, this.selector, extensions)],
-        stream
-      );
+  open(peer: PeerId, extensions?: {[key: string]: any}): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.loader.setWaitNotify(async () => {
+        this.loader.notifyWaiting = false;
+        try {
+          const {stream} = await this.dialer.dialProtocol(peer, PROTOCOL);
+          pipe(
+            [newRequest(this.id, this.root, this.selector, extensions)],
+            stream
+          );
+          resolve();
+        } catch (e) {
+          reject(e);
+        }
+      });
     });
   }
 
