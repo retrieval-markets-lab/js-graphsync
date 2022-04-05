@@ -14,6 +14,7 @@
     "@types/bl": "^5.0.2",
     "@types/mime": "^2.0.3",
     "@types/uuid": "^8.3.4",
+    "@types/varint": "^6.0.0",
     "aegir": "^36.2.3",
     "blockstore-core": "^1.0.5",
     "ipfs-unixfs-importer": "^9.0.6",
@@ -39,6 +40,7 @@
     "peer-id": "^0.16.0",
     "uint8arrays": "^3.0.0",
     "uuid": "^8.3.2",
+    "varint": "^6.0.0",
     "varint-decoder": "^1.0.0"
   }
 }
