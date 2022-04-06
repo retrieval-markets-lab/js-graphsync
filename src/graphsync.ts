@@ -114,7 +114,6 @@ export class GraphSync extends EventEmitter {
         msg.rsp.forEach((resp) => this._handleResponse(resp));
       }
       if (msg.req) {
-        console.log("received request", msg.req);
         msg.req.forEach((req) =>
           this._handleRequest(props.connection.remotePeer, req)
         );

@@ -37,7 +37,6 @@ export async function push(path: string, init: PushInit): Promise<void> {
           bl.append(chunk);
         }
         const msg = dagCBOR.decode<TransferMessage>(bl.slice());
-        console.log("received message", msg);
         if (msg.Response && msg.Response.XferID === id) {
           resolve(msg.Response);
         }
