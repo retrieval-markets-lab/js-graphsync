@@ -16,21 +16,21 @@ export type ChannelID = [string, string, number];
 
 export type TransferMessage = {
   IsRq: boolean;
-  Request?: TransferRequest;
-  Response?: TransferResponse;
+  Request: TransferRequest | null;
+  Response: TransferResponse | null;
 };
 
 export type TransferRequest = {
   Type: number;
   XferID: number;
-  BCid?: CID;
-  Paus?: boolean;
-  Part?: boolean;
-  Pull?: boolean;
-  Stor?: Uint8Array;
-  Vouch?: any;
-  VTyp?: string;
-  RestartChannel?: ChannelID;
+  BCid: CID | null;
+  Paus: boolean;
+  Part: boolean;
+  Pull: boolean;
+  Stor: SelectorNode | null;
+  Vouch: any | null;
+  VTyp: string;
+  RestartChannel: ChannelID;
 };
 
 export type TransferResponse = {
@@ -38,7 +38,7 @@ export type TransferResponse = {
   Acpt: boolean;
   Paus: boolean;
   XferID: number;
-  VRes: any;
+  VRes: any | null;
   VTyp: string;
 };
 

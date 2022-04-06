@@ -3,7 +3,7 @@ import {useState, useEffect} from "react";
 import * as ReactDOM from "react-dom";
 import {Noise} from "@chainsafe/libp2p-noise";
 import {create as createLibp2p, Libp2p} from "libp2p";
-import {fetch, GraphSync} from "@dcdn/graphsync";
+import {fetch, push, GraphSync} from "@dcdn/graphsync";
 import {Cachestore} from "@dcdn/cachestore";
 import type {Store} from "interface-store";
 import type {CID} from "multiformats";
@@ -11,9 +11,58 @@ import {Multiaddr} from "multiaddr";
 import filters from "libp2p-websockets/src/filters";
 import WebSockets from "libp2p-websockets";
 import Mplex from "libp2p-mplex";
+import {useDropzone} from "react-dropzone";
+import {importer} from "ipfs-unixfs-importer";
 
 const CID_KEY = "/cid/default";
 const ADDR_KEY = "/maddr/default";
+const MAX_CHUNK_SIZE = 262144;
+
+function fileIterator(file: File): AsyncIterable<Uint8Array> {
+  let index = 0;
+
+  const iterator = {
+    next: (): Promise<IteratorResult<Uint8Array>> => {
+      if (index > file.size) {
+        return Promise.resolve({
+          done: true,
+          value: null,
+        });
+      }
+
+      return new Promise((resolve, reject) => {
+        const chunk = file.slice(index, MAX_CHUNK_SIZE);
+        index += MAX_CHUNK_SIZE;
+
+        const reader = new global.FileReader();
+
+        const handleLoad = (ev) => {
+          // @ts-ignore No overload matches this call.
+          reader.removeEventListener("loadend", handleLoad, false);
+
+          if (ev.error) {
+            return reject(ev.error);
+          }
+
+          resolve({
+            done: false,
+            value: new Uint8Array(reader.result as ArrayBuffer),
+          });
+        };
+
+        // @ts-ignore No overload matches this call.
+        reader.addEventListener("loadend", handleLoad);
+        reader.readAsArrayBuffer(chunk);
+      });
+    },
+  };
+
+  return {
+    [Symbol.asyncIterator]: () => {
+      return iterator;
+    },
+  };
+}
 
 function Spinner() {
   return (
@@ -49,7 +98,9 @@ function Spinner() {
 
 class Client {
   exchange: GraphSync;
+  store: Store<CID, Uint8Array>;
   constructor(net: Libp2p, store: Store<CID, Uint8Array>) {
+    this.store = store;
     this.exchange = new GraphSync(net, store);
     this.exchange.start();
   }
@@ -59,6 +110,17 @@ class Client {
       exchange: this.exchange,
       headers: {},
       provider: peerAddr,
+      voucher: ["any"],
+      voucherType: "BasicVoucher",
+    });
+  }
+  push(path: string, maddr: string): Promise<void> {
+    const peerAddr = new Multiaddr(maddr);
+    return push(path, {
+      exchange: this.exchange,
+      maddr: peerAddr,
+      voucher: ["any"],
+      voucherType: "BasicVoucher",
     });
   }
 }
@@ -70,9 +132,44 @@ function App() {
   const [vid, setVid] = useState("");
   const [loading, setLoading] = useState(false);
   const [client, setClient] = useState<Client | null>(null);
+  const [uproot, setUproot] = useState<CID | null>(null);
+
+  const onDrop = async (files: File[]) => {
+    if (!client) {
+      console.error("not client initialized");
+      return;
+    }
+    for await (const chunk of importer(
+      files.map((f) => ({path: f.name, content: fileIterator(f)})),
+      client.store,
+      {
+        cidVersion: 1,
+        maxChunkSize: 256 * 1024,
+        rawLeaves: true,
+        wrapWithDirectory: true,
+      }
+    )) {
+      console.log(chunk.path, chunk.cid);
+      if (chunk.path === "") {
+        setUproot(chunk.cid);
+      }
+    }
+  };
+
+  const {getRootProps, getInputProps, isDragActive} = useDropzone({onDrop});
 
   const disabled = !root || !maddr || loading;
 
+  function upload() {
+    if (!client || !uproot) {
+      return;
+    }
+    console.log("uploading");
+    client
+      .push(uproot.toString(), maddr)
+      .then(() => console.log("uploaded"))
+      .catch(console.error);
+  }
   function sendRequest() {
     if (disabled || !client) {
       return;
@@ -160,7 +257,17 @@ function App() {
       <button className="btn" onClick={sendRequest} disabled={disabled}>
         request
       </button>
-      <p className="p">{!!client && "wasm loaded"}</p>
+      <div {...getRootProps({className: "drp"})}>
+        <input {...getInputProps()} />
+        {uproot ? (
+          <p>{uproot.toString()}</p>
+        ) : (
+          <p>Drag or click to add files</p>
+        )}
+      </div>
+      <button className="btn" onClick={upload}>
+        upload
+      </button>
     </div>
   );
 }

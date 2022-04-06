@@ -31,7 +31,7 @@ import type {
 import {Node, walkBlocks, parseContext, unixfsReifier} from "./traversal";
 import {responseBuilder} from "./response-builder";
 
-export class GraphSync {
+export class GraphSync extends EventEmitter {
   started = false;
   network: Network;
   blocks: Blockstore;
@@ -43,6 +43,7 @@ export class GraphSync {
   requests: Map<string, Request> = new Map();
 
   constructor(net: Network, blocks: Blockstore) {
+    super();
     this.network = net;
     this.blocks = blocks;
   }
@@ -86,8 +87,18 @@ export class GraphSync {
     }
   }
   async _handleRequest(peer: PeerId, req: GraphSyncRequest) {
-    const {stream} = await this.network.dialProtocol(peer, PROTOCOL);
-    await pipe(responseBuilder(req, this.blocks), lp.encode(), stream);
+    try {
+      const {stream} = await this.network.dialProtocol(peer, PROTOCOL);
+      await pipe(responseBuilder(req, this.blocks), lp.encode(), stream);
+      this.emit("responseCompleted", {id: req.id, root: req.root, peer});
+    } catch (e) {
+      this.emit("networkErrorListener", {
+        id: req.id,
+        root: req.root,
+        peer,
+        error: e,
+      });
+    }
   }
   async _handler(props: HandlerProps) {
     const source = props.stream.source as AsyncIterable<BufferList>;
@@ -103,6 +114,7 @@ export class GraphSync {
         msg.rsp.forEach((resp) => this._handleResponse(resp));
       }
       if (msg.req) {
+        console.log("received request", msg.req);
         msg.req.forEach((req) =>
           this._handleRequest(props.connection.remotePeer, req)
         );
