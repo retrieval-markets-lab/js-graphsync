@@ -31,8 +31,7 @@ function fileIterator(file: File): AsyncIterable<Uint8Array> {
       }
 
       return new Promise((resolve, reject) => {
-        const chunk = file.slice(index, MAX_CHUNK_SIZE);
-        index += MAX_CHUNK_SIZE;
+        const chunk = file.slice(index, (index += MAX_CHUNK_SIZE));
 
         const reader = new global.FileReader();
 
@@ -144,12 +143,11 @@ function App() {
       client.store,
       {
         cidVersion: 1,
-        maxChunkSize: 256 * 1024,
         rawLeaves: true,
         wrapWithDirectory: true,
       }
     )) {
-      console.log(chunk.path, chunk.cid);
+      console.log(chunk);
       if (chunk.path === "") {
         setUproot(chunk.cid);
       }

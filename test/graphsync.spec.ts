@@ -8,6 +8,7 @@ import {importer} from "ipfs-unixfs-importer";
 import {resolve, unixfsPathSelector} from "../src/resolver";
 
 describe("graphsync", () => {
+  // this test mocks libp2p so it can run in the browser.
   it("e2e", async () => {
     const store1 = new MemoryBlockstore();
     const net1 = new MockLibp2p(

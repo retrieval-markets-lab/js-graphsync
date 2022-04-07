@@ -140,7 +140,7 @@ export function newRequest(
     req.ext = ext;
   }
   return lp.encode.single(
-    new Buffer(
+    Buffer.from(
       dagCBOR.encode<GraphSyncMessageRoot>({
         gs2: {
           req: [req],
