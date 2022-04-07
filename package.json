@@ -3,14 +3,28 @@
   "version": "0.1.0",
   "description": "JS implementation of GraphSync and DataTransfer protocols",
   "main": "dist/src/index.js",
+  "files": [
+    "src",
+    "dist"
+  ],
   "scripts": {
     "build": "aegir build",
     "test": "aegir test",
+    "test:node": "npm run test -- -t node",
     "check": "aegir check"
   },
   "author": "Myel <thomas@myel.dev>",
   "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=7.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/myelnet/js-graphsync.git"
+  },
   "devDependencies": {
+    "@chainsafe/libp2p-noise": "5.0.0",
     "@types/bl": "^5.0.2",
     "@types/mime": "^2.0.3",
     "@types/uuid": "^8.3.4",
@@ -20,6 +34,8 @@
     "ipfs-unixfs-importer": "^9.0.6",
     "it-pair": "^1.0.0",
     "libp2p-interfaces": "^2.0.1",
+    "libp2p-mplex": "^0.10.5",
+    "libp2p-tcp": "^0.17.2",
     "prettier": "^2.6.1"
   },
   "dependencies": {
@@ -42,5 +58,9 @@
     "uuid": "^8.3.2",
     "varint": "^6.0.0",
     "varint-decoder": "^1.0.0"
+  },
+  "types": "dist/src/index.d.ts",
+  "publishConfig": {
+    "access": "public"
   }
 }
