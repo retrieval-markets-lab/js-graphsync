@@ -1,22 +1,29 @@
-import type {MuxedStream, HandlerProps} from "libp2p";
-import type PeerId from "peer-id";
-import type {Multiaddr} from "multiaddr";
+import type {PeerId} from "@libp2p/interface-peer-id";
+import type {Multiaddr} from "@multiformats/multiaddr";
+import type {
+  StreamHandler,
+  StreamHandlerOptions,
+} from "@libp2p/interface-registrar";
+import type {Stream} from "@libp2p/interface-connection";
 
-export type Network = ProtocolDialer &
-  ProtocolHandlerRegistrar &
-  PeerAddressRegistrar;
+export type Network = ProtocolDialer & Registrar & PeerAddressRegistrar;
+
+// simplified version of the registrar
+interface Registrar {
+  handle: (
+    protocol: string,
+    handler: StreamHandler,
+    options?: StreamHandlerOptions
+  ) => Promise<void>;
+  unhandle: (protocol: string) => Promise<void>;
+}
 
 export interface ProtocolDialer {
   dialProtocol: (
-    peer: PeerId,
-    protocols: string[] | string,
+    peer: PeerId | Multiaddr,
+    protocols: string | string[],
     options?: any
-  ) => Promise<{stream: MuxedStream; protocol: string}>;
-}
-
-export interface ProtocolHandlerRegistrar {
-  handle: (protocol: string, handler: (props: HandlerProps) => void) => void;
-  unhandle: (protocol: string | string[]) => void;
+  ) => Promise<Stream>;
 }
 
 export interface PeerAddressRegistrar {

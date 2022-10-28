@@ -1,7 +1,7 @@
-import type {HandlerProps, MuxedStream, Connection} from "libp2p";
-import {Connection as Conn} from "libp2p-interfaces/src/connection";
-import PeerId from "peer-id";
-import {Multiaddr} from "multiaddr";
+import type {IncomingStreamData} from "@libp2p/interface-registrar";
+import type {Stream} from "@libp2p/interface-connection";
+import type {PeerId} from "@libp2p/interface-peer-id";
+import type {Multiaddr} from "@multiformats/multiaddr";
 import {EventEmitter} from "events";
 // @ts-ignore
 import pair from "it-pair";
@@ -20,7 +20,7 @@ class MockAddressBook {
 
 export class MockLibp2p {
   streamId = 0;
-  handlers: {[key: string]: (props: HandlerProps) => void} = {};
+  handlers: {[key: string]: (props: IncomingStreamData) => void} = {};
 
   peerId: PeerId;
   connectionManager = new EventEmitter();
@@ -30,81 +30,30 @@ export class MockLibp2p {
 
   sources: {[key: string]: AsyncIterable<BufferList>} = {};
 
-  openStreams: MuxedStream[] = [];
+  openStreams: Stream[] = [];
 
   constructor(peerId: PeerId) {
     this.peerId = peerId;
   }
 
-  handle(protocol: string, handler: (props: HandlerProps) => void) {
+  async handle(protocol: string, handler: (props: IncomingStreamData) => void) {
     this.handlers[protocol] = handler;
   }
 
-  unhandle(protocol: string | string[]) {
+  async unhandle(protocol: string | string[]) {
     const protos = Array.isArray(protocol) ? protocol : [protocol];
     protos.forEach((p) => {
       delete this.handlers[p];
     });
   }
 
-  async dial(
-    peer: string | PeerId | Multiaddr,
-    options?: any
-  ): Promise<Connection> {
-    const localAddr = new Multiaddr("/ip4/127.0.0.1/tcp/8080");
-    const remoteAddr = new Multiaddr("/ip4/127.0.0.1/tcp/8081");
-
-    const [localPeer, remotePeer] = [
-      PeerId.createFromB58String(
-        "12D3KooWSoLzampfxc4t3sy9z7yq1Cgzbi7zGXpV7nvt5hfeKUhR"
-      ),
-      PeerId.createFromB58String(
-        "12D3KooWSoLzampfxc4t3sy9z7yq1Cgzbi7zGXpV7nvt5hfeKRhU"
-      ),
-    ];
-    const openStreams: MuxedStream[] = [];
-    let streamId = 0;
-
-    return new Conn({
-      localPeer: localPeer,
-      remotePeer: remotePeer,
-      localAddr,
-      remoteAddr,
-      stat: {
-        timeline: {
-          open: Date.now() - 10,
-          upgraded: Date.now(),
-        },
-        direction: "outbound",
-        encryption: "/noise",
-        multiplexer: "/mplex/6.7.0",
-      },
-      newStream: async (protocols) => {
-        const id = streamId++;
-        const stream = pair();
-
-        stream.close = () => stream.sink([]);
-        stream.id = id;
-
-        openStreams.push(stream);
-
-        return {
-          stream,
-          protocol: protocols[0],
-        };
-      },
-      close: async () => {},
-      getStreams: () => openStreams,
-    });
-  }
-
   async dialProtocol(
-    peer: PeerId,
+    peer: PeerId | Multiaddr,
     protocols: string[] | string,
     options?: any
-  ): Promise<{stream: MuxedStream; protocol: string}> {
+  ): Promise<Stream> {
     const id = "" + this.streamId++;
-    const stream: MuxedStream =
+    const stream: Stream =
       id in this.sources
         ? {
             source: this.sources[id],
@@ -124,7 +73,7 @@ export class MockLibp2p {
       // @ts-ignore
       this.handlers[conn.protocol]({stream, connection: conn});
     }
-    return conn;
+    return stream;
   }
 }
 

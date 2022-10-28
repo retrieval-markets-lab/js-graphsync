@@ -2,15 +2,15 @@ import * as React from "react";
 import {useState, useEffect} from "react";
 import * as ReactDOM from "react-dom";
 import {Noise} from "@chainsafe/libp2p-noise";
-import {create as createLibp2p, Libp2p} from "libp2p";
+import {createLibp2p, Libp2p} from "libp2p";
 import {fetch, push, GraphSync} from "@dcdn/graphsync";
 import {Cachestore} from "@dcdn/cachestore";
 import type {Store} from "interface-store";
 import type {CID} from "multiformats";
-import {Multiaddr} from "multiaddr";
-import filters from "libp2p-websockets/src/filters";
-import WebSockets from "libp2p-websockets";
-import Mplex from "libp2p-mplex";
+import {multiaddr} from "multiaddr";
+import {mplex} from "@libp2p/mplex";
+import {webSockets} from "@libp2p/websockets";
+import * as filters from "@libp2p/websockets/filters";
 import {useDropzone} from "react-dropzone";
 import {importer} from "ipfs-unixfs-importer";
 
@@ -104,7 +104,7 @@ class Client {
     this.exchange.start();
   }
   fetch(path: string, maddr: string): Promise<Response> {
-    const peerAddr = new Multiaddr(maddr);
+    const peerAddr = multiaddr(maddr);
     return fetch(path, {
       exchange: this.exchange,
       headers: {},
@@ -114,7 +114,7 @@ class Client {
     });
   }
   push(path: string, maddr: string): Promise<void> {
-    const peerAddr = new Multiaddr(maddr);
+    const peerAddr = multiaddr(maddr);
     return push(path, {
       exchange: this.exchange,
       maddr: peerAddr,
@@ -199,21 +199,9 @@ function App() {
     await blocks.open();
 
     const libp2p = await createLibp2p({
-      modules: {
-        transport: [WebSockets],
-        connEncryption: [new Noise()],
-        streamMuxer: [Mplex],
-      },
-      config: {
-        transport: {
-          [WebSockets.prototype[Symbol.toStringTag]]: {
-            filter: filters.all,
-          },
-        },
-        peerDiscovery: {
-          autoDial: false,
-        },
-      },
+      transports: [webSockets({filter: filters.all})],
+      connectionEncryption: [() => new Noise()],
+      streamMuxers: [mplex()],
     });
     await libp2p.start();
     return new Client(libp2p, blocks);

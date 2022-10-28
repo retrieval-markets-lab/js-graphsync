@@ -1,25 +1,22 @@
-import {expect} from "aegir/utils/chai.js";
-import {create as createLibp2p, Libp2p} from "libp2p";
-import PeerId from "peer-id";
-import Mplex from "libp2p-mplex";
-import TCP from "libp2p-tcp";
-import {NOISE} from "@chainsafe/libp2p-noise";
+import {expect} from "aegir/chai";
+import {createLibp2p, Libp2p} from "libp2p";
+import {mplex} from "@libp2p/mplex";
+import {tcp} from "@libp2p/tcp";
+import {Noise} from "@chainsafe/libp2p-noise";
 import {MemoryBlockstore} from "blockstore-core/memory";
 import {importer} from "ipfs-unixfs-importer";
-import {GraphSync} from "../src/graphsync";
-import {unixfsPathSelector, resolve} from "../src/resolver";
-import {concatChunkIterator} from "./mock-libp2p";
+import {GraphSync} from "../src/graphsync.js";
+import {unixfsPathSelector, resolve} from "../src/resolver.js";
+import {concatChunkIterator} from "./mock-libp2p.js";
 
 async function createNode(): Promise<Libp2p> {
   const node = await createLibp2p({
     addresses: {
       listen: ["/ip4/0.0.0.0/tcp/0"],
     },
-    modules: {
-      transport: [TCP],
-      connEncryption: [NOISE],
-      streamMuxer: [Mplex],
-    },
+    streamMuxers: [mplex()],
+    transports: [tcp()],
+    connectionEncryption: [() => new Noise()],
   });
   await node.start();
   return node;
@@ -60,7 +57,7 @@ describe("listening", () => {
     const store2 = new MemoryBlockstore();
     const net2 = await createNode();
 
-    net2.peerStore.addressBook.add(net1.peerId, net1.multiaddrs);
+    net2.peerStore.addressBook.add(net1.peerId, net1.getMultiaddrs());
 
     const provider = new GraphSync(net1, store1);
     provider.start();
