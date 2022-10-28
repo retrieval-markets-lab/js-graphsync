@@ -193,6 +193,7 @@ func run() error {
 
 	host, err := libp2p.New(
 		libp2p.ListenAddrStrings(
+			"/ip4/0.0.0.0/tcp/41505",
 			"/ip4/0.0.0.0/tcp/41506/ws",
 		),
 		// Explicitly declare transports

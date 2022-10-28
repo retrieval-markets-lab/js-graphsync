@@ -1,4 +1,4 @@
-export * from "./traversal";
-export {GraphSync, Request} from "./graphsync";
-export {fetch, unixfsPathSelector} from "./resolver";
-export {push} from "./push";
+export * from "./traversal.js";
+export {GraphSync, Request} from "./graphsync.js";
+export {fetch, unixfsPathSelector} from "./resolver.js";
+export {push} from "./push.js";

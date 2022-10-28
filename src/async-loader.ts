@@ -4,7 +4,7 @@ import {
   blockFromStore,
   KnownReifiers,
   NodeReifier,
-} from "./traversal";
+} from "./traversal.js";
 import type {Block} from "multiformats/block";
 import type {CID} from "multiformats";
 

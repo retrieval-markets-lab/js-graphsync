@@ -1,9 +1,9 @@
-import {expect} from "aegir/utils/chai.js";
-import {resolve, unixfsPathSelector} from "../src/resolver";
+import {expect} from "aegir/chai";
+import {resolve, unixfsPathSelector} from "../src/resolver.js";
 import {MemoryBlockstore} from "blockstore-core/memory";
-import {MockLibp2p, concatChunkIterator} from "./mock-libp2p";
-import PeerId from "peer-id";
-import {GraphSync} from "../src/graphsync";
+import {MockLibp2p, concatChunkIterator} from "./mock-libp2p.js";
+import {peerIdFromString} from "@libp2p/peer-id";
+import {GraphSync} from "../src/graphsync.js";
 import {importer} from "ipfs-unixfs-importer";
 
 describe("resolver", () => {
@@ -42,9 +42,7 @@ describe("resolver", () => {
     }
 
     const libp2p = new MockLibp2p(
-      PeerId.createFromB58String(
-        "12D3KooWSoLzampfxc4t3sy9z7yq1Cgzbi7zGXpV7nvt5hfeKUhR"
-      )
+      peerIdFromString("12D3KooWSoLzampfxc4t3sy9z7yq1Cgzbi7zGXpV7nvt5hfeKUhR")
     );
     const exchange = new GraphSync(libp2p, blocks);
 
@@ -54,9 +52,7 @@ describe("resolver", () => {
     const {root, selector} = unixfsPathSelector(cid.toString() + "/first");
     const request = exchange.request(root, selector);
     request.open(
-      PeerId.createFromB58String(
-        "12D3KooWSWERLeRUwpGrigog1Aa3riz9zBSShBPqdMcqYsPs7Bfw"
-      )
+      peerIdFromString("12D3KooWSWERLeRUwpGrigog1Aa3riz9zBSShBPqdMcqYsPs7Bfw")
     );
     const content = resolve(root, selector, request);
     const buf = await concatChunkIterator(content);

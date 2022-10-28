@@ -1,16 +1,13 @@
-import lp from "it-length-prefixed";
-import type BufferList from "bl/BufferList";
-import type {Network, ProtocolDialer} from "./network";
-import type {HandlerProps} from "libp2p";
+import type {Network, ProtocolDialer} from "./network.js";
+import type {IncomingStreamData} from "@libp2p/interface-registrar";
 import type {CID, hasher} from "multiformats";
 import type {Block} from "multiformats/block";
-import type PeerId from "peer-id";
+import type {PeerId} from "@libp2p/interface-peer-id";
+import {encode as lpEncode, decode as lpDecode} from "it-length-prefixed";
 import {EventEmitter} from "events";
 import {v4 as uuidv4, stringify as uuidStringify} from "uuid";
 import {pipe} from "it-pipe";
-import {AsyncLoader} from "./async-loader";
-// @ts-ignore (no types)
-import vd from "varint-decoder";
+import {AsyncLoader} from "./async-loader.js";
 import {sha256} from "multiformats/hashes/sha2";
 import drain from "it-drain";
 import {
@@ -21,15 +18,15 @@ import {
   GraphSyncResponse,
   decodeMessage,
   newRequest,
-} from "./messages";
+} from "./messages.js";
 import type {
   SelectorNode,
   Blockstore,
   KnownReifiers,
   NodeReifier,
-} from "./traversal";
-import {Node, walkBlocks, parseContext, unixfsReifier} from "./traversal";
-import {responseBuilder} from "./response-builder";
+} from "./traversal.js";
+import {Node, walkBlocks, parseContext, unixfsReifier} from "./traversal.js";
+import {responseBuilder} from "./response-builder.js";
 
 export class GraphSync extends EventEmitter {
   started = false;
@@ -88,8 +85,8 @@ export class GraphSync extends EventEmitter {
   }
   async _handleRequest(peer: PeerId, req: GraphSyncRequest) {
     try {
-      const {stream} = await this.network.dialProtocol(peer, PROTOCOL);
-      await pipe(responseBuilder(req, this.blocks), lp.encode(), stream);
+      const stream = await this.network.dialProtocol(peer, PROTOCOL);
+      await pipe(responseBuilder(req, this.blocks), lpEncode(), stream);
       this.emit("responseCompleted", {id: req.id, root: req.root, peer});
     } catch (e) {
       this.emit("networkErrorListener", {
@@ -100,9 +97,8 @@ export class GraphSync extends EventEmitter {
       });
     }
   }
-  async _handler(props: HandlerProps) {
-    const source = props.stream.source as AsyncIterable<BufferList>;
-    for await (const chunk of lp.decode()(source)) {
+  async _handler({stream, connection}: IncomingStreamData) {
+    for await (const chunk of lpDecode()(stream.source)) {
       const msg = decodeMessage(chunk.slice());
       if (msg.blk && msg.rsp) {
         this._loadBlocksForRequests(
@@ -115,7 +111,7 @@ export class GraphSync extends EventEmitter {
       }
       if (msg.req) {
         msg.req.forEach((req) =>
-          this._handleRequest(props.connection.remotePeer, req)
+          this._handleRequest(connection.remotePeer, req)
         );
       }
     }
@@ -154,7 +150,7 @@ export class Request extends EventEmitter {
       this.loader.setWaitNotify(async () => {
         this.loader.notifyWaiting = false;
         try {
-          const {stream} = await this.dialer.dialProtocol(peer, PROTOCOL);
+          const stream = await this.dialer.dialProtocol(peer, PROTOCOL);
           pipe(
             [newRequest(this.id, this.root, this.selector, extensions)],
             stream

@@ -3,10 +3,10 @@ import {Block} from "multiformats/block";
 import {Buffer} from "buffer";
 import {parse as uuidParse} from "uuid";
 import * as dagCBOR from "@ipld/dag-cbor";
-import type BufferList from "bl/BufferList";
-import * as varint from "varint";
-import lp from "it-length-prefixed";
-import {SelectorNode, decoderFor} from "./traversal";
+import type {Uint8ArrayList} from "uint8arraylist";
+import varint from "varint";
+import {encode} from "it-length-prefixed";
+import {SelectorNode, decoderFor} from "./traversal.js";
 
 export const PROTOCOL = "/ipfs/graphsync/2.0.0";
 
@@ -128,7 +128,7 @@ export function newRequest(
   root: CID,
   sel: SelectorNode,
   ext?: GraphSyncExtensions
-): BufferList {
+): Uint8ArrayList {
   const req: GraphSyncRequest = {
     id: uuidParse(id) as Uint8Array,
     type: GraphSyncRequestType.New,
@@ -139,7 +139,7 @@ export function newRequest(
   if (ext) {
     req.ext = ext;
   }
-  return lp.encode.single(
+  return encode.single(
     Buffer.from(
       dagCBOR.encode<GraphSyncMessageRoot>({
         gs2: {

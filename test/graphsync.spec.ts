@@ -1,20 +1,18 @@
-import {expect} from "aegir/utils/chai.js";
-import {GraphSync} from "../src/graphsync";
-import {PROTOCOL} from "../src/messages";
-import {MockLibp2p, concatChunkIterator} from "./mock-libp2p";
-import PeerId from "peer-id";
+import {expect} from "aegir/chai";
+import {GraphSync} from "../src/graphsync.js";
+import {PROTOCOL} from "../src/messages.js";
+import {MockLibp2p, concatChunkIterator} from "./mock-libp2p.js";
+import {peerIdFromString} from "@libp2p/peer-id";
 import {MemoryBlockstore} from "blockstore-core/memory";
 import {importer} from "ipfs-unixfs-importer";
-import {resolve, unixfsPathSelector} from "../src/resolver";
+import {resolve, unixfsPathSelector} from "../src/resolver.js";
 
 describe("graphsync", () => {
   // this test mocks libp2p so it can run in the browser.
   it("e2e", async () => {
     const store1 = new MemoryBlockstore();
     const net1 = new MockLibp2p(
-      PeerId.createFromB58String(
-        "12D3KooWSoLzampfxc4t3sy9z7yq1Cgzbi7zGXpV7nvt5hfeKUhR"
-      )
+      peerIdFromString("12D3KooWSoLzampfxc4t3sy9z7yq1Cgzbi7zGXpV7nvt5hfeKUhR")
     );
 
     const first = new Uint8Array(5 * 256);
@@ -46,9 +44,7 @@ describe("graphsync", () => {
 
     const store2 = new MemoryBlockstore();
     const net2 = new MockLibp2p(
-      PeerId.createFromB58String(
-        "12D3KooWHFrmLWTTDD4NodngtRMEVYgxrsDMp4F9iSwYntZ9WjHa"
-      )
+      peerIdFromString("12D3KooWHFrmLWTTDD4NodngtRMEVYgxrsDMp4F9iSwYntZ9WjHa")
     );
 
     const provider = new GraphSync(net1, store1);

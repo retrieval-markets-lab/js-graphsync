@@ -1,4 +1,4 @@
-import {expect} from "aegir/utils/chai.js";
+import {expect} from "aegir/chai";
 import {encode} from "multiformats/block";
 import * as dagCBOR from "@ipld/dag-cbor";
 import {MemoryBlockstore} from "blockstore-core/memory";
@@ -12,8 +12,8 @@ import {
   walkBlocks,
   ExploreRecursive,
   unixfsReifier,
-} from "../src/traversal";
-import {unixfsPathSelector} from "../src/resolver";
+} from "../src/traversal.js";
+import {unixfsPathSelector} from "../src/resolver.js";
 
 describe("traversal", () => {
   it("walk blocks", async () => {

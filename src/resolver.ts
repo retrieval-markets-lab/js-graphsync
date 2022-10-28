@@ -1,7 +1,8 @@
 import {CID} from "multiformats";
 import {UnixFS} from "ipfs-unixfs";
-import PeerId from "peer-id";
-import type {Multiaddr} from "multiaddr";
+import {peerIdFromString} from "@libp2p/peer-id";
+import type {Multiaddr} from "@multiformats/multiaddr";
+import type {PeerId} from "@libp2p/interface-peer-id";
 import {
   allSelector,
   Node,
@@ -10,9 +11,9 @@ import {
   parseContext,
   walkBlocks,
   SelectorNode,
-} from "./traversal";
-import mime from "mime/lite";
-import type {GraphSync} from "./graphsync";
+} from "./traversal.js";
+import mime from "mime/lite.js";
+import type {GraphSync} from "./graphsync.js";
 
 const EXTENSION = "fil/data-transfer/1.1";
 
@@ -63,7 +64,7 @@ export function getPeerID(addr: Multiaddr): PeerId {
   if (idx === 0) {
     throw new Error("Multiaddr does not contain p2p peer ID");
   }
-  return PeerId.createFromB58String(parts[idx]);
+  return peerIdFromString(parts[idx]);
 }
 
 // Iterate an IPLD traversal and resolve UnixFS blocks

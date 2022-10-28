@@ -5,10 +5,10 @@ import {
   ResponseStatusCode,
   GraphSyncBlock,
   GraphSyncLinkAction,
-} from "./messages";
+} from "./messages.js";
 import * as dagCBOR from "@ipld/dag-cbor";
 import type {CID} from "multiformats";
-import * as varint from "varint";
+import varint from "varint";
 import {
   Blockstore,
   walkBlocks,
@@ -16,7 +16,7 @@ import {
   unixfsReifier,
   Node,
   parseContext,
-} from "./traversal";
+} from "./traversal.js";
 
 const MAX_SIZE = 256 * 1024;
 

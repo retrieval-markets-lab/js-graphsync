@@ -1,10 +1,10 @@
-import type {GraphSync} from "./graphsync";
-import {unixfsPathSelector, getPeerID} from "./resolver";
-import type {Multiaddr} from "multiaddr";
+import type {GraphSync} from "./graphsync.js";
+import {unixfsPathSelector, getPeerID} from "./resolver.js";
+import type {Multiaddr} from "@multiformats/multiaddr";
 import {pipe} from "it-pipe";
 import * as dagCBOR from "@ipld/dag-cbor";
-import type {TransferMessage, TransferResponse} from "./messages";
-import BufferList from "bl/BufferList";
+import type {TransferMessage, TransferResponse} from "./messages.js";
+import {Uint8ArrayList} from "uint8arraylist";
 
 const DT_PROTOCOL = "/fil/datatransfer/1.2.0";
 
@@ -31,12 +31,12 @@ export async function push(path: string, init: PushInit): Promise<void> {
   // data transfer will send a response with details if the request is accepted or refused.
   const resPromise = new Promise<TransferResponse>((resolve, reject) => {
     exchange.network.handle(DT_PROTOCOL, ({stream}) => {
-      pipe(stream, async (source: AsyncIterable<BufferList>) => {
-        const bl = new BufferList();
+      pipe(stream, async (source) => {
+        const bl = new Uint8ArrayList();
         for await (const chunk of source) {
           bl.append(chunk);
         }
-        const msg = dagCBOR.decode<TransferMessage>(bl.slice());
+        const msg = dagCBOR.decode<TransferMessage>(bl.subarray());
         if (msg.Response && msg.Response.XferID === id) {
           resolve(msg.Response);
         }
@@ -44,7 +44,7 @@ export async function push(path: string, init: PushInit): Promise<void> {
     });
   });
 
-  const {stream} = await exchange.network.dialProtocol(pid, DT_PROTOCOL);
+  const stream = await exchange.network.dialProtocol(pid, DT_PROTOCOL);
   await pipe(
     [
       dagCBOR.encode<TransferMessage>({
