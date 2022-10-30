@@ -3,17 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"sort"
 	"syscall"
 
-	datatransfer "github.com/filecoin-project/go-data-transfer"
-	dtimpl "github.com/filecoin-project/go-data-transfer/impl"
-	dtnet "github.com/filecoin-project/go-data-transfer/network"
-	gstransport "github.com/filecoin-project/go-data-transfer/transport/graphsync"
+	datatransfer "github.com/filecoin-project/go-data-transfer/v2"
+	dtimpl "github.com/filecoin-project/go-data-transfer/v2/impl"
+	dtnet "github.com/filecoin-project/go-data-transfer/v2/network"
+	gstransport "github.com/filecoin-project/go-data-transfer/v2/transport/graphsync"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/namespace"
@@ -24,115 +22,48 @@ import (
 	"github.com/ipfs/go-graphsync/storeutil"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	logging "github.com/ipfs/go-log/v2"
-	"github.com/ipld/go-ipld-prime"
+	"github.com/ipld/go-ipld-prime/datamodel"
 	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-tcp-transport"
-	websocket "github.com/libp2p/go-ws-transport"
-	cbg "github.com/whyrusleeping/cbor-gen"
-	"golang.org/x/xerrors"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
+	"github.com/libp2p/go-libp2p/p2p/transport/websocket"
+
+	_ "github.com/ipld/go-ipld-prime/codec/raw"
 )
 
-type BasicVoucher struct {
-	Data string
-}
-
-// Type satisfies registry.Entry
-func (bv BasicVoucher) Type() datatransfer.TypeIdentifier {
-	return "BasicVoucher"
-}
-
-var _ = xerrors.Errorf
-var _ = cid.Undef
-var _ = sort.Sort
-
-var lengthBufFakeDTType = []byte{129}
-
-func (t *BasicVoucher) MarshalCBOR(w io.Writer) error {
-	if t == nil {
-		_, err := w.Write(cbg.CborNull)
-		return err
-	}
-	if _, err := w.Write(lengthBufFakeDTType); err != nil {
-		return err
-	}
-
-	scratch := make([]byte, 9)
-
-	// t.Data (string) (string)
-	if len(t.Data) > cbg.MaxLength {
-		return xerrors.Errorf("Value in field t.Data was too long")
-	}
-
-	if err := cbg.WriteMajorTypeHeaderBuf(scratch, w, cbg.MajTextString, uint64(len(t.Data))); err != nil {
-		return err
-	}
-	if _, err := io.WriteString(w, string(t.Data)); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (t *BasicVoucher) UnmarshalCBOR(r io.Reader) error {
-	*t = BasicVoucher{}
-
-	br := cbg.GetPeeker(r)
-	scratch := make([]byte, 8)
-
-	maj, extra, err := cbg.CborReadHeaderBuf(br, scratch)
-	if err != nil {
-		return err
-	}
-	if maj != cbg.MajArray {
-		return fmt.Errorf("cbor input should be of type array")
-	}
-
-	if extra != 1 {
-		return fmt.Errorf("cbor input had wrong number of fields")
-	}
-
-	// t.Data (string) (string)
-
-	{
-		sval, err := cbg.ReadStringBuf(br, scratch)
-		if err != nil {
-			return err
-		}
-
-		t.Data = string(sval)
-	}
-	return nil
-}
-
 type Validator struct {
-	result datatransfer.VoucherResult
+	result datatransfer.ValidationResult
 }
 
 // NewValidator returns a new instance of a data transfer validator
 func NewValidator() *Validator {
-	return &Validator{}
+	return &Validator{
+		result: datatransfer.ValidationResult{Accepted: true},
+	}
 }
 
 // ValidatePush returns a result for a push validation
 func (sv *Validator) ValidatePush(
-	isRestart bool,
 	chid datatransfer.ChannelID,
 	sender peer.ID,
-	voucher datatransfer.Voucher,
+	voucher datamodel.Node,
 	baseCid cid.Cid,
-	selector ipld.Node) (datatransfer.VoucherResult, error) {
+	selector datamodel.Node) (datatransfer.ValidationResult, error) {
 	return sv.result, nil
 }
 
 // ValidatePull returns a result for a pull validation
 func (sv *Validator) ValidatePull(
-	isRestart bool,
 	chid datatransfer.ChannelID,
 	receiver peer.ID,
-	voucher datatransfer.Voucher,
+	voucher datamodel.Node,
 	baseCid cid.Cid,
-	selector ipld.Node) (datatransfer.VoucherResult, error) {
+	selector datamodel.Node) (datatransfer.ValidationResult, error) {
+	return sv.result, nil
+}
+
+func (sv *Validator) ValidateRestart(chid datatransfer.ChannelID, channelState datatransfer.ChannelState) (datatransfer.ValidationResult, error) {
 	return sv.result, nil
 }
 
@@ -217,7 +148,7 @@ func run() error {
 	}
 
 	validator := NewValidator()
-	err = dt.RegisterVoucherType(&BasicVoucher{}, validator)
+	err = dt.RegisterVoucherType(datatransfer.TypeIdentifier("BasicVoucher"), validator)
 	if err != nil {
 		return err
 	}

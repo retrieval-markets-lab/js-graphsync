@@ -26,7 +26,7 @@ export function decoderFor(cid: CID): Decoder | null {
 export async function blockFromStore(
   cid: CID,
   bs: Blockstore
-): Promise<Block<any>> {
+): Promise<Block<any, any, any, any>> {
   const bytes = await bs.get(cid);
   const decode = decoderFor(cid);
   return new Block({cid, bytes, value: decode ? decode(bytes) : bytes});
@@ -41,7 +41,7 @@ export class LinkSystem implements LinkLoader {
       this.reifiers = reifiers;
     }
   }
-  load(cid: CID): Promise<Block<any>> {
+  load(cid: CID): Promise<Block<any, any, any, any>> {
     return blockFromStore(cid, this.store);
   }
   reifier(name: string): NodeReifier | undefined {
@@ -120,11 +120,9 @@ function is(value: any): Kind {
 // most requests use the same selectors so we memoize the blocks
 // for improved performance
 export const selToBlock = (function () {
-  const memo: Map<SelectorNode, Block<SelectorNode>> = new Map();
+  const memo: Map<SelectorNode, any> = new Map();
 
-  async function encodeSelToBlock(
-    sel: SelectorNode
-  ): Promise<Block<SelectorNode>> {
+  async function encodeSelToBlock(sel: SelectorNode): Promise<any> {
     const m = memo.get(sel);
     if (m) {
       return m;
@@ -607,7 +605,7 @@ export function unixfsReifier(node: Node, loader: LinkLoader): Node {
 }
 
 export interface LinkLoader {
-  load(cid: CID): Promise<Block<any>>;
+  load(cid: CID): Promise<Block<any, any, any, any>>;
   reifier(name: string): NodeReifier | undefined;
   close(): void;
 }
@@ -617,7 +615,7 @@ export async function* walkBlocks(
   node: Node,
   sel: Selector,
   source: LinkLoader
-): AsyncIterable<Block<any>> {
+): AsyncIterable<Block<any, any, any, any>> {
   let nd = node;
   if (nd.kind === Kind.Link) {
     const blk = await source.load(nd.value);

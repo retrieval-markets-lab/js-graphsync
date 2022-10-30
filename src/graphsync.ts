@@ -15,6 +15,7 @@ import {
   GraphSyncBlock,
   decodeBlock,
   GraphSyncRequest,
+  GraphSyncRequestType,
   GraphSyncResponse,
   decodeMessage,
   newRequest,
@@ -85,9 +86,23 @@ export class GraphSync extends EventEmitter {
   }
   async _handleRequest(peer: PeerId, req: GraphSyncRequest) {
     try {
-      const stream = await this.network.dialProtocol(peer, PROTOCOL);
-      await pipe(responseBuilder(req, this.blocks), lpEncode(), stream);
-      this.emit("responseCompleted", {id: req.id, root: req.root, peer});
+      switch (req.type) {
+        case GraphSyncRequestType.New:
+          const stream = await this.network.dialProtocol(peer, PROTOCOL);
+          await pipe(responseBuilder(req, this.blocks), lpEncode(), stream);
+          this.emit("responseCompleted", {id: req.id, root: req.root, peer});
+          break;
+        case GraphSyncRequestType.Cancel:
+          this.emit("requestCancelled", {id: req.id, root: req.root, peer});
+          break;
+        default:
+          this.emit("networkErrorListener", {
+            id: req.id,
+            root: req.root,
+            peer,
+            error: new Error("unknown request type"),
+          });
+      }
     } catch (e) {
       this.emit("networkErrorListener", {
         id: req.id,
@@ -180,11 +195,11 @@ export class Request extends EventEmitter {
   // TODO
   close() {}
 
-  load(link: CID): Promise<Block<any>> {
+  load(link: CID): Promise<Block<any, any, any, any>> {
     return this.loader.load(link);
   }
 
-  incomingBlockHook(block: Block<any>) {
+  incomingBlockHook(block: Block<any, any, any, any>) {
     this.emit("incomingBlock", {link: block.cid, size: block.bytes.length});
   }
 

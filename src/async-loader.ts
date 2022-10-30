@@ -9,11 +9,11 @@ import type {Block} from "multiformats/block";
 import type {CID} from "multiformats";
 
 interface Resolvable {
-  resolve: (res: Block<any>) => void;
+  resolve: (res: Block<any, any, any, any>) => void;
   reject: (res: Error) => void;
 }
 
-export type BlockNotifyFn = (block: Block<any>) => void;
+export type BlockNotifyFn = (block: Block<any, any, any, any>) => void;
 
 export type WaitNotifyFn = (cid: CID) => void;
 
@@ -25,7 +25,7 @@ export class AsyncLoader implements LinkLoader {
   // notify callback when the loader is waiting for a bock
   waitNotify?: WaitNotifyFn;
   // pending are block that have been pushed but not yet loaded
-  pending: Map<string, Block<any>> = new Map();
+  pending: Map<string, Block<any, any, any, any>> = new Map();
   // loaded is a set of string CIDs for content that was loaded.
   // content included in the set will be flushed to the blockstore.
   loaded: Set<string> = new Set();
@@ -47,7 +47,7 @@ export class AsyncLoader implements LinkLoader {
       this.setWaitNotify(waitNotify);
     }
   }
-  async load(cid: CID): Promise<Block<any>> {
+  async load(cid: CID): Promise<Block<any, any, any, any>> {
     const k = cid.toString();
     try {
       let blk = this.pending.get(k);
@@ -67,7 +67,7 @@ export class AsyncLoader implements LinkLoader {
   }
   // waitForBlock will queue up a promise that will get resolved once a block
   // is pushed to the loader.
-  async waitForBlock(cid: CID): Promise<Block<any>> {
+  async waitForBlock(cid: CID): Promise<Block<any, any, any, any>> {
     const block = this.pending.get(cid.toString());
     if (block) {
       return block;
@@ -89,7 +89,7 @@ export class AsyncLoader implements LinkLoader {
   }
 
   // these are trusted blocks and don't need to be verified
-  push(block: Block<any>) {
+  push(block: Block<any, any, any, any>) {
     const k = block.cid.toString();
     const pending = this.pullQueue.get(k);
     if (pending) {
@@ -99,7 +99,7 @@ export class AsyncLoader implements LinkLoader {
     }
   }
   // move a pending block to the blockstore.
-  flush(blk: Block<any>) {
+  flush(blk: Block<any, any, any, any>) {
     if (!this.loaded.has(blk.cid.toString())) {
       this.tracker?.(blk);
       this.store
