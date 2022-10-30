@@ -87,7 +87,7 @@ type GraphSyncMetadatum = [CID, GraphSyncLinkAction];
 
 export type GraphSyncMetadata = GraphSyncMetadatum[];
 
-enum GraphSyncRequestType {
+export enum GraphSyncRequestType {
   New = "n",
   Cancel = "c",
   Update = "u",
@@ -157,7 +157,7 @@ export function decodeMessage(bytes: Uint8Array): GraphSyncMessage {
 export async function decodeBlock(
   block: GraphSyncBlock,
   hashers: {[key: number]: hasher.MultihashHasher<any>}
-): Promise<Block<any>> {
+): Promise<Block<any, any, any, any>> {
   let offset = 0;
   const cidVersion = varint.decode(block[0], offset) as any;
   offset += varint.decode.bytes;

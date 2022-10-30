@@ -4,11 +4,11 @@ import * as ReactDOM from "react-dom";
 import {Noise} from "@chainsafe/libp2p-noise";
 import {createLibp2p, Libp2p} from "libp2p";
 import {fetch, push, GraphSync} from "@dcdn/graphsync";
-import {Cachestore} from "@dcdn/cachestore";
+import {Cachestore} from "cache-blockstore";
 import type {Store} from "interface-store";
 import type {CID} from "multiformats";
-import {multiaddr} from "multiaddr";
-import {mplex} from "@libp2p/mplex";
+import {multiaddr} from "@multiformats/multiaddr";
+import {yamux} from "@chainsafe/libp2p-yamux";
 import {webSockets} from "@libp2p/websockets";
 import * as filters from "@libp2p/websockets/filters";
 import {useDropzone} from "react-dropzone";
@@ -201,7 +201,7 @@ function App() {
     const libp2p = await createLibp2p({
       transports: [webSockets({filter: filters.all})],
       connectionEncryption: [() => new Noise()],
-      streamMuxers: [mplex()],
+      streamMuxers: [yamux()],
     });
     await libp2p.start();
     return new Client(libp2p, blocks);
