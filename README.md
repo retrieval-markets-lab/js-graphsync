@@ -20,26 +20,19 @@ npm install @dcdn/graphsync
 ## Usage
 
 ```ts
-import {create, getPeer} from "libp2p";
+import {createLibp2p, getPeer} from "libp2p";
 import {Noise} from "@chainsafe/libp2p-noise";
-import WebSockets from "libp2p-websockets";
-import Mplex from "libp2p-mplex";
+import {webSockets} from "@libp2p/websockets";
+import {yamux} from "@chainsafe/libp2p-yamux";
 import {MemoryBlockstore} from "blockstore-core/memory";
 import {GraphSync, unixfsPathSelector} from "@dcdn/graphsync";
 
 const blocks = new MemoryBlockstore();
 
 const libp2p = await createLibp2p({
-  modules: {
-    transport: [WebSockets],
-    connEncryption: [new Noise()],
-    streamMuxer: [Mplex],
-  },
-  config: {
-    peerDiscovery: {
-      autoDial: false,
-    },
-  },
+  transports: [webSockets()],
+  connectionEncryption: [() => new Noise()],
+  streamMuxers: [yamux()],
 });
 await libp2p.start();
     
