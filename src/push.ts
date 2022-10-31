@@ -45,6 +45,7 @@ export async function push(path: string, init: PushInit): Promise<void> {
   });
 
   const stream = await exchange.network.dialProtocol(pid, DT_PROTOCOL);
+  console.log("stream open");
   await pipe(
     [
       dagCBOR.encode<TransferMessage>({
@@ -66,6 +67,7 @@ export async function push(path: string, init: PushInit): Promise<void> {
     ],
     stream
   );
+  console.log("piped request");
   const response = await resPromise;
   if (!response.Acpt) {
     throw new Error("request refused");

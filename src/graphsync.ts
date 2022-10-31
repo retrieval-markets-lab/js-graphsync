@@ -113,6 +113,7 @@ export class GraphSync extends EventEmitter {
     }
   }
   async _handler({stream, connection}: IncomingStreamData) {
+    console.log("received Graphsync stream");
     for await (const chunk of lpDecode()(stream.source)) {
       const msg = decodeMessage(chunk.slice());
       if (msg.blk && msg.rsp) {
