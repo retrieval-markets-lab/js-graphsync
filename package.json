@@ -12,6 +12,7 @@
     "test": "aegir test",
     "test:node": "aegir test -t node -f \"./dist/test/**/*.{node,spec}.js\" --cov",
     "test:chrome": "aegir test -t browser -f \"./dist/test/**/*.spec.js\" --cov",
+    "bench": "aegir test -t node -f \"./dist/test/benchmarks.spec.js\"",
     "version": "aegir -v",
     "check": "aegir check"
   },
@@ -28,8 +29,11 @@
   "type": "module",
   "devDependencies": {
     "@chainsafe/libp2p-noise": "^9.0.0",
+    "@chainsafe/libp2p-yamux": "^3.0.2",
+    "@ipld/car": "^5.0.0",
     "@libp2p/interface-mocks": "^7.0.3",
     "@libp2p/mplex": "^7.0.0",
+    "@stablelib/benchmark": "^1.0.1",
     "@types/bl": "^5.0.2",
     "@types/mime": "^2.0.3",
     "@types/uuid": "^8.3.4",

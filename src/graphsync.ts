@@ -62,6 +62,7 @@ export class GraphSync extends EventEmitter {
     this.requests.set(id, request);
     return request;
   }
+
   _loadBlocksForRequests(gblocks: GraphSyncBlock[], reqids: string[]) {
     for (const block of gblocks) {
       decodeBlock(block, this.hashers)
@@ -132,6 +133,47 @@ export class GraphSync extends EventEmitter {
       }
     }
   }
+}
+
+export async function gsRequest(
+  blocks: Blockstore,
+  libp2p: Network,
+  root: CID,
+  selector: SelectorNode,
+  peer: PeerId,
+  hashers: {[key: number]: hasher.MultihashHasher<any>}
+): Promise<{
+  loader: AsyncLoader;
+  close: () => void;
+}> {
+  const loader = new AsyncLoader(blocks);
+
+  libp2p.handle(PROTOCOL, async ({stream, connection}) => {
+    for await (const chunk of lpDecode()(stream.source)) {
+      const msg = decodeMessage(chunk.slice());
+      if (msg.blk && msg.rsp) {
+        for (const block of msg.blk) {
+          decodeBlock(block, hashers)
+            .then((blk) => loader.push(blk))
+            .catch((err) => {
+              console.log(err);
+            });
+        }
+      }
+    }
+  });
+
+  const stream = await libp2p.dialProtocol(peer, PROTOCOL);
+  const id = uuidv4();
+  await pipe([newRequest(id, root, selector)], stream);
+  stream.close();
+
+  return {
+    loader,
+    close: () => {
+      return libp2p.unhandle(PROTOCOL);
+    },
+  };
 }
 
 export class Request extends EventEmitter {
