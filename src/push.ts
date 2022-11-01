@@ -66,6 +66,7 @@ export async function push(path: string, init: PushInit): Promise<void> {
     ],
     stream
   );
+  await stream.close();
   const response = await resPromise;
   if (!response.Acpt) {
     throw new Error("request refused");

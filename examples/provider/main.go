@@ -28,6 +28,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/libp2p/go-libp2p/p2p/transport/websocket"
+	webtransport "github.com/libp2p/go-libp2p/p2p/transport/webtransport"
 
 	_ "github.com/ipld/go-ipld-prime/codec/raw"
 )
@@ -126,10 +127,12 @@ func run() error {
 		libp2p.ListenAddrStrings(
 			"/ip4/0.0.0.0/tcp/41505",
 			"/ip4/0.0.0.0/tcp/41506/ws",
+			"/ip4/0.0.0.0/udp/41507/quic/webtransport",
 		),
 		// Explicitly declare transports
 		libp2p.Transport(tcp.NewTCPTransport),
 		libp2p.Transport(websocket.New),
+		libp2p.Transport(webtransport.New),
 		libp2p.DisableRelay(),
 	)
 	if err != nil {

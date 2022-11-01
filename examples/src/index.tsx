@@ -8,9 +8,7 @@ import {Cachestore} from "cache-blockstore";
 import type {Store} from "interface-store";
 import type {CID} from "multiformats";
 import {multiaddr} from "@multiformats/multiaddr";
-import {yamux} from "@chainsafe/libp2p-yamux";
-import {webSockets} from "@libp2p/websockets";
-import * as filters from "@libp2p/websockets/filters";
+import {webTransport} from "@libp2p/webtransport";
 import {useDropzone} from "react-dropzone";
 import {importer} from "ipfs-unixfs-importer";
 
@@ -199,9 +197,8 @@ function App() {
     await blocks.open();
 
     const libp2p = await createLibp2p({
-      transports: [webSockets({filter: filters.all})],
+      transports: [webTransport()],
       connectionEncryption: [() => new Noise()],
-      streamMuxers: [yamux()],
     });
     await libp2p.start();
     return new Client(libp2p, blocks);

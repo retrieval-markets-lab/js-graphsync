@@ -1,5 +1,5 @@
 import {expect} from "aegir/chai";
-import {resolve, unixfsPathSelector} from "../src/resolver.js";
+import {resolve, unixfsPathSelector, getPeer} from "../src/resolver.js";
 import {MemoryBlockstore} from "blockstore-core/memory";
 import {MockLibp2p, concatChunkIterator} from "./mock-libp2p.js";
 import {peerIdFromString} from "@libp2p/peer-id";
@@ -57,5 +57,15 @@ describe("resolver", () => {
     const content = resolve(root, selector, request);
     const buf = await concatChunkIterator(content);
     expect(buf).to.deep.equal(first);
+  });
+
+  it("can parse a peer info", () => {
+    const {id, multiaddrs} = getPeer(
+      "/ip4/127.0.0.1/tcp/41505/ws/p2p/12D3KooWCYiNWNDoprcW74NVCEKaMhSbrfMvY4JEMfWrV1JamSsA"
+    );
+    expect(id.toString()).to.equal(
+      "12D3KooWCYiNWNDoprcW74NVCEKaMhSbrfMvY4JEMfWrV1JamSsA"
+    );
+    expect(multiaddrs[0].protos()[0].name).to.equal("ip4");
   });
 });
