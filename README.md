@@ -19,20 +19,20 @@ npm install @dcdn/graphsync
 
 ## Usage
 
+It is recommended to use with the [WebTransport](https://github.com/libp2p/js-libp2p-webtransport) transport for best performance.
+
 ```ts
-import {createLibp2p, getPeer} from "libp2p";
+import {createLibp2p} from "libp2p";
 import {Noise} from "@chainsafe/libp2p-noise";
-import {webSockets} from "@libp2p/websockets";
-import {yamux} from "@chainsafe/libp2p-yamux";
+import {webTransport} from "@libp2p/webtransport";
 import {MemoryBlockstore} from "blockstore-core/memory";
-import {GraphSync, unixfsPathSelector} from "@dcdn/graphsync";
+import {GraphSync, unixfsPathSelector, getPeer} from "@dcdn/graphsync";
 
 const blocks = new MemoryBlockstore();
 
 const libp2p = await createLibp2p({
-  transports: [webSockets()],
+  transports: [webTransport()],
   connectionEncryption: [() => new Noise()],
-  streamMuxers: [yamux()],
 });
 await libp2p.start();
     

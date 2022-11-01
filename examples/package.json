@@ -16,13 +16,9 @@
   },
   "dependencies": {
     "@chainsafe/libp2p-noise": "^9.0.0",
-    "@chainsafe/libp2p-yamux": "^3.0.2",
     "@dcdn/graphsync": "file:..",
-    "@libp2p/tcp": "^5.0.1",
-    "@libp2p/websockets": "^5.0.0",
     "@libp2p/webtransport": "^1.0.3",
     "@multiformats/multiaddr": "^11.0.5",
-    "buffer": "^6.0.3",
     "cache-blockstore": "^0.1.0",
     "ipfs-unixfs-importer": "^11.0.1",
     "libp2p": "^0.40.0",

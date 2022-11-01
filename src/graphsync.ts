@@ -90,6 +90,7 @@ export class GraphSync extends EventEmitter {
         case GraphSyncRequestType.New:
           const stream = await this.network.dialProtocol(peer, PROTOCOL);
           await pipe(responseBuilder(req, this.blocks), lpEncode(), stream);
+          await stream.close();
           this.emit("responseCompleted", {id: req.id, root: req.root, peer});
           break;
         case GraphSyncRequestType.Cancel:
@@ -113,7 +114,6 @@ export class GraphSync extends EventEmitter {
     }
   }
   async _handler({stream, connection}: IncomingStreamData) {
-    console.log("received Graphsync stream");
     for await (const chunk of lpDecode()(stream.source)) {
       const msg = decodeMessage(chunk.slice());
       if (msg.blk && msg.rsp) {
@@ -167,10 +167,11 @@ export class Request extends EventEmitter {
         this.loader.notifyWaiting = false;
         try {
           const stream = await this.dialer.dialProtocol(peer, PROTOCOL);
-          pipe(
+          await pipe(
             [newRequest(this.id, this.root, this.selector, extensions)],
             stream
           );
+          await stream.close();
           resolve();
         } catch (e) {
           reject(e);

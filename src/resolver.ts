@@ -1,7 +1,7 @@
 import {CID} from "multiformats";
 import {UnixFS} from "ipfs-unixfs";
 import {peerIdFromString} from "@libp2p/peer-id";
-import type {Multiaddr} from "@multiformats/multiaddr";
+import {multiaddr, Multiaddr} from "@multiformats/multiaddr";
 import type {PeerId} from "@libp2p/interface-peer-id";
 import {
   allSelector,
@@ -65,6 +65,14 @@ export function getPeerID(addr: Multiaddr): PeerId {
     throw new Error("Multiaddr does not contain p2p peer ID");
   }
   return peerIdFromString(parts[idx]);
+}
+
+export function getPeer(addr: string): {id: PeerId; multiaddrs: Multiaddr[]} {
+  const ma = multiaddr(addr);
+  return {
+    id: getPeerID(ma),
+    multiaddrs: [ma],
+  };
 }
 
 // Iterate an IPLD traversal and resolve UnixFS blocks
