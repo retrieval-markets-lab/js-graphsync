@@ -1,5 +1,5 @@
 import {expect} from "aegir/chai";
-import {GraphSync} from "../src/graphsync.js";
+import {graphsync} from "../src/graphsync.js";
 import {PROTOCOL} from "../src/messages.js";
 import {MockLibp2p, concatChunkIterator} from "./mock-libp2p.js";
 import {peerIdFromString} from "@libp2p/peer-id";
@@ -47,19 +47,16 @@ describe("graphsync", () => {
       peerIdFromString("12D3KooWHFrmLWTTDD4NodngtRMEVYgxrsDMp4F9iSwYntZ9WjHa")
     );
 
-    const provider = new GraphSync(net1, store1);
-    provider.start();
+    const provider = graphsync(store1, net1);
+    await provider.start();
 
     const {root, selector} = unixfsPathSelector(cid.toString() + "/second");
-    const client = new GraphSync(net2, store2);
+    const client = graphsync(store2, net2);
     client.start();
 
-    const request = client.request(root, selector);
-    const open = request.open(net1.peerId);
+    const request = await client.request(root, selector, net1.peerId);
 
-    const promise = concatChunkIterator(resolve(cid, selector, request));
-
-    await open;
+    const promise = concatChunkIterator(resolve(cid, selector, request.loader));
 
     const inbound = net2.openStreams.pop();
     if (!inbound) {

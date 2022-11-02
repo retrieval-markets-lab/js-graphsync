@@ -111,26 +111,26 @@ export async function* resolve(
   }
 }
 
-type FetchInit = {
-  headers: {[key: string]: string};
-  provider: Multiaddr;
-  exchange: GraphSync;
-  voucher?: any;
-  voucherType?: string;
-};
-
 /**
  * Convenience method for consuming graphsync content as an HTTP Response object.
  * fecth also supports authenticating requests via the data-transfer protocol used by Filecoin.
  * Please note that it doesn't support revalidation.
  */
+
+type FetchInit = {
+  headers: {[key: string]: string};
+  maddr: string;
+  client: GraphSync;
+  voucher?: any;
+  voucherType?: string;
+};
+
 export async function fetch(url: string, init: FetchInit): Promise<Response> {
-  const {headers, exchange, provider, voucher, voucherType} = init;
+  const {headers, client, maddr, voucher, voucherType} = init;
 
   const {root, selector: sel} = unixfsPathSelector(url);
-  const pid = getPeerID(provider);
-  exchange.network.peerStore.addressBook.add(pid, [provider]);
-  const request = exchange.request(root, sel);
+  const {id, multiaddrs} = getPeer(maddr);
+  client.network.peerStore.addressBook.add(id, multiaddrs);
   const extensions: {[key: string]: any} = {};
   if (voucher && voucherType) {
     const id = Date.now();
@@ -151,9 +151,9 @@ export async function fetch(url: string, init: FetchInit): Promise<Response> {
       Response: null,
     };
   }
-  request.open(pid, extensions);
+  const request = await client.request(root, sel, id, extensions);
 
-  const content = resolve(root, sel, request);
+  const content = resolve(root, sel, request.loader);
   const iterator = content[Symbol.asyncIterator]();
 
   try {
@@ -179,6 +179,7 @@ export async function fetch(url: string, init: FetchInit): Promise<Response> {
         console.log(e);
         writer.abort((e as Error).message);
       }
+      console.log("closed");
       request.close();
     }
     write();

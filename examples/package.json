@@ -17,6 +17,7 @@
   "dependencies": {
     "@chainsafe/libp2p-noise": "^9.0.0",
     "@dcdn/graphsync": "file:..",
+    "@libp2p/peer-id-factory": "^1.0.19",
     "@libp2p/webtransport": "^1.0.3",
     "@multiformats/multiaddr": "^11.0.5",
     "cache-blockstore": "^0.1.0",

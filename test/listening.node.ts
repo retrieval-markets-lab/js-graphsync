@@ -5,7 +5,7 @@ import {tcp} from "@libp2p/tcp";
 import {Noise} from "@chainsafe/libp2p-noise";
 import {MemoryBlockstore} from "blockstore-core/memory";
 import {importer} from "ipfs-unixfs-importer";
-import {GraphSync} from "../src/graphsync.js";
+import {graphsync} from "../src/graphsync.js";
 import {unixfsPathSelector, resolve} from "../src/resolver.js";
 import {concatChunkIterator} from "./mock-libp2p.js";
 
@@ -59,17 +59,21 @@ describe("listening", () => {
 
     net2.peerStore.addressBook.add(net1.peerId, net1.getMultiaddrs());
 
-    const provider = new GraphSync(net1, store1);
-    provider.start();
+    const provider = graphsync(store1, net1);
+    await provider.start();
 
-    const client = new GraphSync(net2, store2);
-    client.start();
+    const client = graphsync(store2, net2);
+    await client.start();
     const {root, selector} = unixfsPathSelector(cid.toString() + "/first");
 
-    const request = client.request(root, selector);
-    request.open(net1.peerId);
+    const request = await client.request(root, selector, net1.peerId);
 
-    const buf = await concatChunkIterator(resolve(cid, selector, request));
+    const buf = await concatChunkIterator(
+      resolve(cid, selector, request.loader)
+    );
     expect(buf).to.deep.equal(first);
+
+    await net1.stop();
+    await net2.stop();
   });
 });

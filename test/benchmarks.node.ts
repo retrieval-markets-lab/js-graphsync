@@ -30,11 +30,10 @@ import {MemoryBlockstore} from "blockstore-core/memory";
 import type {Options} from "interface-store";
 import {createLibp2p, Libp2p} from "libp2p";
 import {tcp} from "@libp2p/tcp";
-// import {Noise} from "@chainsafe/libp2p-noise";
-import {GraphSync, gsRequest} from "../src/graphsync.js";
+import {Noise} from "@chainsafe/libp2p-noise";
+import {graphsync} from "../src/graphsync.js";
 import {unixfsPathSelector, resolve as resolveIpld} from "../src/resolver.js";
 import {mplex} from "@libp2p/mplex";
-import {plaintext} from "libp2p/insecure";
 
 const car_file = resolve("test/fixtures/blackhole.car");
 
@@ -112,8 +111,8 @@ async function createNode(): Promise<Libp2p> {
     },
     streamMuxers: [mplex()],
     transports: [tcp()],
-    connectionEncryption: [plaintext()],
-    // connectionEncryption: [() => new Noise()],
+    // connectionEncryption: [plaintext()],
+    connectionEncryption: [() => new Noise()],
   });
   await node.start();
   return node;
@@ -122,7 +121,7 @@ async function createNode(): Promise<Libp2p> {
 describe.skip("benchmarks", () => {
   const size = fs.statSync(car_file).size;
 
-  it("verify car file", async () => {
+  it.skip("verify car file", async () => {
     report(
       "car stream",
       await benchmarkPromise(async () => {
@@ -138,7 +137,7 @@ describe.skip("benchmarks", () => {
     );
   });
 
-  it("traverses a car file", async () => {
+  it.skip("traverses a car file", async () => {
     const reader = await CarIndexedReader.fromFile(car_file);
     const loader = loaderFromCar(reader);
 
@@ -155,7 +154,7 @@ describe.skip("benchmarks", () => {
     );
   });
 
-  it("streams from graphsync messages", async () => {
+  it.skip("streams from graphsync messages", async () => {
     const reader = await CarIndexedReader.fromFile(car_file);
     const store = new CarBlockstore(reader);
     const root = (await reader.getRoots())[0];
@@ -208,30 +207,25 @@ describe.skip("benchmarks", () => {
     const net2 = await createNode();
     net2.peerStore.addressBook.add(net1.peerId, net1.getMultiaddrs());
 
-    const provider = new GraphSync(net1, store1);
-    provider.start();
+    const provider = graphsync(store1, net1);
+    await provider.start();
 
     report(
       "graphsync e2e",
       await benchmarkPromise(async () => {
         const store2 = new MemoryBlockstore();
+        const client = graphsync(store2, net2, hashes);
+        await client.start();
 
         const {root, selector} = unixfsPathSelector(
           cid.toString() + "/blackhole.gif"
         );
 
-        const {loader, close} = await gsRequest(
-          store2,
-          net2,
-          root,
-          selector,
-          net1.peerId,
-          hashes
-        );
+        const {loader} = await client.request(root, selector, net1.peerId);
 
         for await (const _ of resolveIpld(cid, selector, loader)) {
         }
-        await close();
+        await client.stop();
       }, size)
     );
 

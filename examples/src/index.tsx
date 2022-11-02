@@ -3,7 +3,7 @@ import {useState, useEffect} from "react";
 import * as ReactDOM from "react-dom";
 import {Noise} from "@chainsafe/libp2p-noise";
 import {createLibp2p, Libp2p} from "libp2p";
-import {fetch, push, GraphSync} from "@dcdn/graphsync";
+import {fetch, push, graphsync, GraphSync} from "@dcdn/graphsync";
 import {Cachestore} from "cache-blockstore";
 import type {Store} from "interface-store";
 import type {CID} from "multiformats";
@@ -98,27 +98,28 @@ class Client {
   store: Store<CID, Uint8Array>;
   constructor(net: Libp2p, store: Store<CID, Uint8Array>) {
     this.store = store;
-    this.exchange = new GraphSync(net, store);
-    this.exchange.start();
+    this.exchange = graphsync(store, net);
   }
   fetch(path: string, maddr: string): Promise<Response> {
-    const peerAddr = multiaddr(maddr);
-    return fetch(path, {
-      exchange: this.exchange,
-      headers: {},
-      provider: peerAddr,
-      voucher: ["any"],
-      voucherType: "BasicVoucher",
-    });
+    return this.exchange.start().then(() =>
+      fetch(path, {
+        client: this.exchange,
+        headers: {},
+        maddr,
+        voucher: ["any"],
+        voucherType: "BasicVoucher",
+      })
+    );
   }
   push(path: string, maddr: string): Promise<void> {
-    const peerAddr = multiaddr(maddr);
-    return push(path, {
-      exchange: this.exchange,
-      maddr: peerAddr,
-      voucher: ["any"],
-      voucherType: "BasicVoucher",
-    });
+    return this.exchange.start().then(() =>
+      push(path, {
+        client: this.exchange,
+        maddr,
+        voucher: ["any"],
+        voucherType: "BasicVoucher",
+      })
+    );
   }
 }
 
