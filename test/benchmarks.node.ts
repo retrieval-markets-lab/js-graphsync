@@ -31,9 +31,11 @@ import type {Options} from "interface-store";
 import {createLibp2p, Libp2p} from "libp2p";
 import {tcp} from "@libp2p/tcp";
 import {Noise} from "@chainsafe/libp2p-noise";
+// import {plaintext} from "libp2p/insecure";
 import {graphsync} from "../src/graphsync.js";
 import {unixfsPathSelector, resolve as resolveIpld} from "../src/resolver.js";
 import {mplex} from "@libp2p/mplex";
+import {pipe} from "it-pipe";
 
 const car_file = resolve("test/fixtures/blackhole.car");
 
@@ -198,7 +200,58 @@ describe.skip("benchmarks", () => {
     );
   });
 
-  it("transfers e2e", async () => {
+  it("streams a whole file", async () => {
+    const PROTO = "/file";
+
+    const options = () => ({
+      addresses: {
+        listen: ["/ip4/0.0.0.0/tcp/0"],
+      },
+      streamMuxers: [mplex()],
+      transports: [tcp()],
+      // connectionEncryption: [plaintext()],
+      connectionEncryption: [() => new Noise()],
+    });
+
+    const node1 = await createLibp2p(options());
+    await node1.start();
+
+    const node2 = await createLibp2p(options());
+    await node2.start();
+
+    node2.peerStore.addressBook.add(node1.peerId, node1.getMultiaddrs());
+
+    // iterate as many times as needed then report the result
+    report(
+      "stream file",
+      await benchmarkPromise(async () => {
+        const file = fs.createReadStream(car_file);
+
+        const receive = new Promise((resolve) => {
+          node1.handle(PROTO, async ({stream}) => {
+            for await (const _ of stream.source);
+            resolve(null);
+          });
+        });
+
+        await Promise.all([
+          receive,
+          (async () => {
+            const stream = await node2.dialProtocol(node1.peerId, PROTO);
+            await pipe(file, stream);
+            await stream.close();
+          })(),
+        ]);
+
+        await node1.unhandle(PROTO);
+      }, size)
+    );
+
+    await node1.stop();
+    await node2.stop();
+  });
+
+  it.skip("transfers e2e", async () => {
     const reader = await CarIndexedReader.fromFile(car_file);
     const store1 = new CarBlockstore(reader);
     const cid = (await reader.getRoots())[0];
