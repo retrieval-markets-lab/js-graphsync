@@ -1,6 +1,6 @@
 {
   "name": "@dcdn/graphsync",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "JS implementation of GraphSync and DataTransfer protocols",
   "main": "dist/src/index.js",
   "files": [
