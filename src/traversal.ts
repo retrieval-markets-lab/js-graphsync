@@ -138,7 +138,14 @@ export const selToBlock = (function () {
   return encodeSelToBlock;
 })();
 
-export class Node {
+export interface Node {
+  kind: Kind;
+  value: any;
+  lookupBySegment(seg: PathSegment): Node | null;
+  entries(): Generator<{pathSegment: PathSegment; value: Node}, any, any>;
+}
+
+export class BasicNode implements Node {
   kind: Kind;
   value: any;
   constructor(value: any) {
@@ -151,6 +158,15 @@ export class Node {
       return val;
     }
     return null;
+  }
+  entries(): Generator<{pathSegment: PathSegment; value: BasicNode}, any, any> {
+    if (this.kind === Kind.List) {
+      return arrayEntries(this.value);
+    }
+    if (this.kind === Kind.Map) {
+      return mapEntries(this.value);
+    }
+    throw new Error(`Cannot call entries on ${this.kind} kind`);
   }
 }
 
@@ -235,13 +251,20 @@ export const entriesSelector: SelectorNode = {
   },
 };
 
-class PathSegment {
+export class PathSegment {
   value: string | number;
   constructor(value: string | number) {
     this.value = value;
   }
   toString(): string {
     return this.value + "";
+  }
+  toIndex(): number {
+    if (typeof this.value === "number") {
+      return this.value;
+    } else {
+      return parseInt(this.value);
+    }
   }
 }
 
@@ -521,61 +544,26 @@ function parseLimit(node: LimitNode): RecursionLimit {
   }
 }
 
-type IteratorState = {
-  pathSegment: PathSegment | null;
-  value: any;
-};
-
-function segmentIterator(node: any) {
-  if (Array.isArray(node)) {
-    return arrayIterator(node);
+function* arrayEntries(
+  node: Array<any>
+): Generator<{pathSegment: PathSegment; value: BasicNode}, any, any> {
+  for (let i = 0; i < node.length; i++) {
+    yield {
+      pathSegment: new PathSegment(i),
+      value: new BasicNode(node[i]),
+    };
   }
-  return mapIterator(node);
 }
 
-function arrayIterator(node: Array<any>) {
-  let i = 0;
-  return {
-    next(): IteratorState {
-      if (i === node.length) {
-        return {
-          pathSegment: null,
-          value: null,
-        };
-      }
-      const index = i++;
-      return {
-        pathSegment: new PathSegment(index),
-        value: node[index],
-      };
-    },
-    done(): boolean {
-      return i === node.length;
-    },
-  };
-}
-
-function mapIterator(node: {[key: string]: any}) {
-  const keys = Object.keys(node);
-  let i = 0;
-  return {
-    next(): IteratorState {
-      if (i === keys.length) {
-        return {
-          pathSegment: null,
-          value: null,
-        };
-      }
-      const index = i++;
-      return {
-        pathSegment: new PathSegment(keys[index]),
-        value: node[keys[index]],
-      };
-    },
-    done(): boolean {
-      return i === keys.length;
-    },
-  };
+function* mapEntries(node: {
+  [key: string]: any;
+}): Generator<{pathSegment: PathSegment; value: BasicNode}, any, any> {
+  for (const [k, v] of Object.entries(node)) {
+    yield {
+      pathSegment: new PathSegment(k),
+      value: new BasicNode(v),
+    };
+  }
 }
 
 export type NodeReifier = (node: Node, loader: LinkLoader) => Node;
@@ -593,9 +581,9 @@ export function unixfsReifier(node: Node, loader: LinkLoader): Node {
       if (unixfs.isDirectory()) {
         const dir: {[key: string]: Node} = {};
         for (const link of node.value.Links) {
-          dir[link.Name] = new Node(link.Hash);
+          dir[link.Name] = new BasicNode(link.Hash);
         }
-        return new Node(dir);
+        return new BasicNode(dir);
       }
     } catch (e) {
       return node;
@@ -621,7 +609,7 @@ export async function* walkBlocks(
     const blk = await source.load(nd.value);
     yield blk;
 
-    nd = new Node(blk.value);
+    nd = new BasicNode(blk.value);
   }
 
   if (sel instanceof ExploreInterpretAs) {
@@ -660,14 +648,10 @@ export async function* walkBlocks(
     }
   } else {
     // visit everything
-    for (const itr = segmentIterator(nd.value); !itr.done(); ) {
-      let {pathSegment, value} = itr.next();
-      if (!pathSegment) {
-        continue;
-      }
+    for (const {pathSegment, value} of nd.entries()) {
       const sNext = sel.explore(nd.value, pathSegment);
       if (sNext !== null) {
-        yield* walkBlocks(new Node(value), sNext, source);
+        yield* walkBlocks(value, sNext, source);
       }
     }
   }

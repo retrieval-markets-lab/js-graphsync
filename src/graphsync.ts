@@ -20,13 +20,18 @@ import {
   decodeMessage,
   newRequest,
 } from "./messages.js";
+import {
+  BasicNode,
+  walkBlocks,
+  parseContext,
+  unixfsReifier,
+} from "./traversal.js";
 import type {
+  NodeReifier,
+  KnownReifiers,
   SelectorNode,
   Blockstore,
-  KnownReifiers,
-  NodeReifier,
 } from "./traversal.js";
-import {Node, walkBlocks, parseContext, unixfsReifier} from "./traversal.js";
 import {responseBuilder} from "./response-builder.js";
 
 export class GraphSync extends EventEmitter {
@@ -183,7 +188,7 @@ export class Request extends EventEmitter {
   async drain() {
     await drain(
       walkBlocks(
-        new Node(this.root),
+        new BasicNode(this.root),
         parseContext().parseSelector(this.selector),
         this
       )
@@ -192,6 +197,10 @@ export class Request extends EventEmitter {
 
   reifier(name: string): NodeReifier {
     return this.reifiers[name];
+  }
+
+  addReifier(name: string, reifier: NodeReifier) {
+    this.reifiers[name] = reifier;
   }
 
   // TODO
