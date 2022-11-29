@@ -5,7 +5,7 @@ import {MemoryBlockstore} from "blockstore-core/memory";
 import {sha256} from "multiformats/hashes/sha2";
 import {importer} from "ipfs-unixfs-importer";
 import {
-  Node,
+  BasicNode,
   allSelector,
   parseContext,
   LinkSystem,
@@ -70,7 +70,7 @@ describe("traversal", () => {
     let i = 0;
 
     for await (const blk of walkBlocks(
-      new Node(grandparent.cid),
+      new BasicNode(grandparent.cid),
       sel,
       source
     )) {
@@ -162,7 +162,7 @@ describe("traversal", () => {
 
     let i = 0;
 
-    for await (const blk of walkBlocks(new Node(root), sel, source)) {
+    for await (const blk of walkBlocks(new BasicNode(root), sel, source)) {
       expect(blk.cid.toString()).to.equal(expected[i]);
       i++;
     }
@@ -184,7 +184,7 @@ describe("traversal", () => {
 
     i = 0;
 
-    for await (const blk of walkBlocks(new Node(root2), sel, source)) {
+    for await (const blk of walkBlocks(new BasicNode(root2), sel, source)) {
       expect(blk.cid.toString()).to.equal(expected[i]);
       i++;
     }

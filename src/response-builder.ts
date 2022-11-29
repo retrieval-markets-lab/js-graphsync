@@ -14,7 +14,7 @@ import {
   walkBlocks,
   LinkSystem,
   unixfsReifier,
-  Node,
+  BasicNode,
   parseContext,
 } from "./traversal.js";
 
@@ -54,7 +54,7 @@ export async function* responseBuilder(
   let meta: GraphSyncMetadata = [];
   let size = 0;
   for await (const block of walkBlocks(
-    new Node(req.root),
+    new BasicNode(req.root),
     parseContext().parseSelector(req.sel),
     ls
   )) {

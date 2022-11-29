@@ -5,7 +5,7 @@ import {multiaddr, Multiaddr} from "@multiformats/multiaddr";
 import type {PeerId} from "@libp2p/interface-peer-id";
 import {
   allSelector,
-  Node,
+  BasicNode,
   Kind,
   LinkLoader,
   parseContext,
@@ -82,7 +82,7 @@ export async function* resolve(
   loader: LinkLoader
 ): AsyncIterable<Uint8Array> {
   for await (const blk of walkBlocks(
-    new Node(root),
+    new BasicNode(root),
     parseContext().parseSelector(selector),
     loader
   )) {
