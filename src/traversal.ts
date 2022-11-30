@@ -141,8 +141,8 @@ export const selToBlock = (function () {
 export interface Node {
   kind: Kind;
   value: any;
-  lookupBySegment(seg: PathSegment): Node | null;
-  entries(): Generator<{pathSegment: PathSegment; value: Node}, any, any>;
+  lookupBySegment(seg: PathSegment): Promise<Node | null>;
+  entries(): AsyncGenerator<{pathSegment: PathSegment; value: Node}, any, any>;
 }
 
 export class BasicNode implements Node {
@@ -152,14 +152,18 @@ export class BasicNode implements Node {
     this.kind = is(value);
     this.value = value;
   }
-  lookupBySegment(seg: PathSegment): Node | null {
+  async lookupBySegment(seg: PathSegment): Promise<Node | null> {
     const val = this.value[seg.value];
     if (val) {
       return val;
     }
     return null;
   }
-  entries(): Generator<{pathSegment: PathSegment; value: BasicNode}, any, any> {
+  entries(): AsyncGenerator<
+    {pathSegment: PathSegment; value: BasicNode},
+    any,
+    any
+  > {
     if (this.kind === Kind.List) {
       return arrayEntries(this.value);
     }
@@ -544,9 +548,9 @@ function parseLimit(node: LimitNode): RecursionLimit {
   }
 }
 
-function* arrayEntries(
+async function* arrayEntries(
   node: Array<any>
-): Generator<{pathSegment: PathSegment; value: BasicNode}, any, any> {
+): AsyncGenerator<{pathSegment: PathSegment; value: BasicNode}, any, any> {
   for (let i = 0; i < node.length; i++) {
     yield {
       pathSegment: new PathSegment(i),
@@ -555,9 +559,9 @@ function* arrayEntries(
   }
 }
 
-function* mapEntries(node: {
+async function* mapEntries(node: {
   [key: string]: any;
-}): Generator<{pathSegment: PathSegment; value: BasicNode}, any, any> {
+}): AsyncGenerator<{pathSegment: PathSegment; value: BasicNode}, any, any> {
   for (const [k, v] of Object.entries(node)) {
     yield {
       pathSegment: new PathSegment(k),
@@ -637,7 +641,7 @@ export async function* walkBlocks(
   const attn = sel.interests();
   if (attn.length) {
     for (const ps of attn) {
-      const value = nd.lookupBySegment(ps);
+      const value = await nd.lookupBySegment(ps);
       if (value === null) {
         break;
       }
@@ -648,7 +652,7 @@ export async function* walkBlocks(
     }
   } else {
     // visit everything
-    for (const {pathSegment, value} of nd.entries()) {
+    for await (const {pathSegment, value} of nd.entries()) {
       const sNext = sel.explore(nd.value, pathSegment);
       if (sNext !== null) {
         yield* walkBlocks(value, sNext, source);
