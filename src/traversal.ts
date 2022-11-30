@@ -208,6 +208,7 @@ export type SelectorNode = {
     // Sequence
     ":>"?: SelectorNode;
   };
+  // ExploreInterpretAs
   "~"?: {
     // adl
     as: string;
@@ -220,7 +221,7 @@ export type SelectorNode = {
   "!"?: SelectorNode; // StopAt
 };
 
-type LimitNode = {
+export type LimitNode = {
   none?: {}; // LimitNone
   depth?: number; // LimitDepth
 };
@@ -252,6 +253,75 @@ export const entriesSelector: SelectorNode = {
         },
       },
     },
+  },
+};
+
+export const selectorBuilder = {
+  depth(val: number): LimitNode {
+    return {
+      depth: val,
+    };
+  },
+  noLimit(): LimitNode {
+    return {
+      none: {},
+    };
+  },
+  exploreRecursive(next: SelectorNode, limit: LimitNode): SelectorNode {
+    return {
+      R: {
+        l: limit,
+        ":>": next,
+      },
+    };
+  },
+  exploreAll(next: SelectorNode): SelectorNode {
+    return {
+      a: {
+        ">": next,
+      },
+    };
+  },
+  edge(): SelectorNode {
+    return {
+      "@": {},
+    };
+  },
+  exploreFields(fields: {[key: string]: SelectorNode}): SelectorNode {
+    return {
+      f: {
+        "f>": fields,
+      },
+    };
+  },
+  exploreInterpretAs(name: string, next: SelectorNode): SelectorNode {
+    return {
+      "~": {
+        as: name,
+        ">": next,
+      },
+    };
+  },
+  match(): SelectorNode {
+    return {
+      ".": {},
+    };
+  },
+  matchSubset(from: number, to: number): SelectorNode {
+    return {
+      ".": {
+        "[": from,
+        "]": to,
+      },
+    };
+  },
+  exploreIndex(index: number, next: SelectorNode): SelectorNode {
+    return {
+      i: {
+        i: index,
+        ">": next,
+      },
+    };
   },
 };
 
@@ -570,11 +640,14 @@ async function* mapEntries(node: {
   }
 }
 
-export type NodeReifier = (node: Node, loader: LinkLoader) => Node;
+export type NodeReifier = (node: Node, loader: LinkLoader) => Promise<Node>;
 
 export type KnownReifiers = {[key: string]: NodeReifier};
 
-export function unixfsReifier(node: Node, loader: LinkLoader): Node {
+export async function unixfsReifier(
+  node: Node,
+  loader: LinkLoader
+): Promise<Node> {
   if (
     node.kind == Kind.Map &&
     node.value.Data &&
@@ -619,7 +692,7 @@ export async function* walkBlocks(
   if (sel instanceof ExploreInterpretAs) {
     const reify = source.reifier(sel.adl);
     if (reify) {
-      const rnd = reify(nd, source);
+      const rnd = await reify(nd, source);
       const next = sel.explore(nd, new PathSegment(""));
       if (next) {
         sel = next;

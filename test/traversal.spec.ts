@@ -7,11 +7,13 @@ import {importer} from "ipfs-unixfs-importer";
 import {
   BasicNode,
   allSelector,
+  entriesSelector,
   parseContext,
   LinkSystem,
   walkBlocks,
   ExploreRecursive,
   unixfsReifier,
+  selectorBuilder as builder,
 } from "../src/traversal.js";
 import {unixfsPathSelector} from "../src/resolver.js";
 
@@ -189,5 +191,38 @@ describe("traversal", () => {
       i++;
     }
     expect(i).to.equal(expected.length);
+  });
+
+  it("build a selector", () => {
+    const selector1 = builder.exploreRecursive(
+      builder.exploreAll(builder.edge()),
+      builder.noLimit()
+    );
+
+    expect(selector1).to.deep.equal(allSelector);
+
+    const selector2 = builder.exploreRecursive(
+      builder.exploreAll(builder.edge()),
+      builder.depth(1)
+    );
+
+    expect(selector2).to.deep.equal(entriesSelector);
+
+    const {selector: unixfsSelector} = unixfsPathSelector(
+      "bafybeiepvdqmdakhtwotvykxujrmt5fcq4xca5jmoo6wzxhjk3q3pqe4te/children/third"
+    );
+
+    const selector3 = builder.exploreInterpretAs(
+      "unixfs",
+      builder.exploreFields({
+        children: builder.exploreInterpretAs(
+          "unixfs",
+          builder.exploreFields({
+            third: selector1,
+          })
+        ),
+      })
+    );
+    expect(selector3).to.deep.equal(unixfsSelector);
   });
 });
