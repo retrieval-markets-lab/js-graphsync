@@ -225,4 +225,61 @@ describe("traversal", () => {
     );
     expect(selector3).to.deep.equal(unixfsSelector);
   });
+
+  it("selects an index", async () => {
+    const bs = new MemoryBlockstore();
+
+    const first = new Uint8Array(5 * 256);
+    const second = new Uint8Array(3 * 256);
+    const third = new Uint8Array(2 * 256);
+    const forth = new Uint8Array(4 * 256);
+
+    // chunk and dagify it then get the root cid
+    let cid;
+    for await (const chunk of importer(
+      [
+        {path: "first", content: first},
+        {path: "second", content: second},
+        {path: "/children/third", content: third},
+        {path: "/children/forth", content: forth},
+      ],
+      bs,
+      {
+        cidVersion: 1,
+        maxChunkSize: 256,
+        rawLeaves: true,
+        wrapWithDirectory: true,
+      }
+    )) {
+      if (chunk.path === "") {
+        cid = chunk.cid;
+      }
+    }
+    const selector = builder.exploreFields({
+      Links: builder.exploreIndex(
+        0,
+        builder.exploreRecursive(
+          builder.exploreAll(builder.edge()),
+          builder.depth(2)
+        )
+      ),
+    });
+
+    const sel = parseContext().parseSelector(selector);
+
+    const source = new LinkSystem(bs);
+
+    let last;
+    for await (const blk of walkBlocks(new BasicNode(cid), sel, source)) {
+      last = blk;
+    }
+
+    if (!last) {
+      throw new Error("failed traversal");
+    }
+
+    expect(last.cid.toString()).to.equal(
+      "bafybeiepvdqmdakhtwotvykxujrmt5fcq4xca5jmoo6wzxhjk3q3pqe4te"
+    );
+  });
 });

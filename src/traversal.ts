@@ -155,7 +155,7 @@ export class BasicNode implements Node {
   async lookupBySegment(seg: PathSegment): Promise<Node | null> {
     const val = this.value[seg.value];
     if (val) {
-      return val;
+      return new BasicNode(val);
     }
     return null;
   }
@@ -374,6 +374,8 @@ export function parseContext() {
           return this.parseExploreInterpretAs(node[key]);
         case ".":
           return this.parseMatcher(node[key]);
+        case "i":
+          return this.parseExploreIndex(node[key]);
         default:
           throw new Error("unknown selector");
       }
@@ -414,6 +416,21 @@ export function parseContext() {
         selections[key] = this.parseSelector(value);
       }
       return new ExploreFields(selections, interests);
+    },
+    parseExploreIndex(node: any): Selector {
+      const index = node["i"];
+      const next = this.parseSelector(node[">"]);
+      if (typeof index !== "number") {
+        throw new Error(
+          "selector spec parse rejected: index field must be present in ExploreIndex selector"
+        );
+      }
+      if (!next) {
+        throw new Error(
+          "selector spec parse rejected: next field must be present in ExploreIndex selector"
+        );
+      }
+      return new ExploreIndex(next, index);
     },
     parseExploreInterpretAs(node: any): Selector {
       const adl = node["as"];
@@ -493,6 +510,30 @@ export class ExploreFields implements Selector {
   }
   explore(node: any, path: PathSegment): Selector | null {
     return this.selections[path.toString()] ?? null;
+  }
+  decide(node: any): boolean {
+    return false;
+  }
+}
+
+export class ExploreIndex implements Selector {
+  next: Selector;
+  interest: [PathSegment];
+  constructor(next: Selector, index: number) {
+    this.next = next;
+    this.interest = [new PathSegment(index)];
+  }
+  interests(): PathSegment[] {
+    return this.interest;
+  }
+  explore(node: any, path: PathSegment): Selector | null {
+    if (!Array.isArray(node)) {
+      return null;
+    }
+    if (path.toIndex() === this.interest[0].toIndex()) {
+      return this.next;
+    }
+    return null;
   }
   decide(node: any): boolean {
     return false;
@@ -656,9 +697,9 @@ export async function unixfsReifier(
     try {
       const unixfs = UnixFS.unmarshal(node.value.Data);
       if (unixfs.isDirectory()) {
-        const dir: {[key: string]: Node} = {};
+        const dir: {[key: string]: CID} = {};
         for (const link of node.value.Links) {
-          dir[link.Name] = new BasicNode(link.Hash);
+          dir[link.Name] = link.Hash;
         }
         return new BasicNode(dir);
       }

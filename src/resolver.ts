@@ -11,6 +11,10 @@ import {
   parseContext,
   walkBlocks,
   SelectorNode,
+  Selector,
+  Node,
+  PathSegment,
+  ExploreInterpretAs,
 } from "./traversal.js";
 import mime from "mime/lite.js";
 import type {GraphSync} from "./graphsync.js";
@@ -192,4 +196,80 @@ export async function fetch(url: string, init: FetchInit): Promise<Response> {
       headers,
     });
   }
+}
+
+export async function resolveQuery(
+  nd: Node,
+  sel: Selector,
+  loader: LinkLoader
+): Promise<any> {
+  if (sel instanceof ExploreInterpretAs) {
+    const reify = loader.reifier(sel.adl);
+    if (reify) {
+      const rnd = await reify(nd, loader);
+      const next = sel.explore(nd, new PathSegment(""));
+      if (next) {
+        sel = next;
+      }
+      nd = rnd;
+    }
+  }
+
+  let results: {[key: string]: any} | any[];
+
+  switch (nd.kind) {
+    case Kind.Map:
+      results = {};
+      break;
+    case Kind.List:
+      results = [];
+      break;
+    default:
+      return nd.value;
+  }
+
+  const attn = sel.interests();
+  if (attn.length) {
+    for (const ps of attn) {
+      let value = await nd.lookupBySegment(ps);
+      if (value === null) {
+        break;
+      }
+      const sNext = sel.explore(nd.value, ps);
+      if (sNext !== null) {
+        if (value.kind === Kind.Link) {
+          const blk = await loader.load(value.value);
+
+          value = new BasicNode(blk.value);
+        }
+
+        const val = await resolveQuery(value, sNext, loader);
+        if (Array.isArray(results)) {
+          results.push(val);
+        } else {
+          results[ps.value] = val;
+        }
+      }
+    }
+  } else {
+    // visit everything
+    for await (let {pathSegment, value} of nd.entries()) {
+      const sNext = sel.explore(nd.value, pathSegment);
+      if (sNext !== null) {
+        if (value.kind === Kind.Link) {
+          const blk = await loader.load(value.value);
+
+          value = new BasicNode(blk.value);
+        }
+
+        const val = await resolveQuery(value, sNext, loader);
+        if (Array.isArray(results)) {
+          results.push(val);
+        } else {
+          results[pathSegment.value] = val;
+        }
+      }
+    }
+  }
+  return results;
 }
