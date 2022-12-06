@@ -2,7 +2,7 @@ import {expect} from "aegir/chai";
 import {createLibp2p, Libp2p} from "libp2p";
 import {mplex} from "@libp2p/mplex";
 import {tcp} from "@libp2p/tcp";
-import {Noise} from "@chainsafe/libp2p-noise";
+import {noise} from "@chainsafe/libp2p-noise";
 import {MemoryBlockstore} from "blockstore-core/memory";
 import {importer} from "ipfs-unixfs-importer";
 import {GraphSync} from "../src/graphsync.js";
@@ -16,7 +16,7 @@ async function createNode(): Promise<Libp2p> {
     },
     streamMuxers: [mplex()],
     transports: [tcp()],
-    connectionEncryption: [() => new Noise()],
+    connectionEncryption: [noise()],
   });
   await node.start();
   return node;

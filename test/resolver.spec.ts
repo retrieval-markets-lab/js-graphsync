@@ -1,10 +1,24 @@
 import {expect} from "aegir/chai";
-import {resolve, unixfsPathSelector, getPeer} from "../src/resolver.js";
+import {
+  resolve,
+  unixfsPathSelector,
+  getPeer,
+  resolveQuery,
+} from "../src/resolver.js";
+import {
+  selectorBuilder as sb,
+  BasicNode,
+  parseContext,
+  LinkSystem,
+} from "../src/traversal.js";
 import {MemoryBlockstore} from "blockstore-core/memory";
 import {MockLibp2p, concatChunkIterator} from "./mock-libp2p.js";
 import {peerIdFromString} from "@libp2p/peer-id";
 import {GraphSync} from "../src/graphsync.js";
 import {importer} from "ipfs-unixfs-importer";
+import {encode} from "multiformats/block";
+import * as codec from "@ipld/dag-cbor";
+import {sha256 as hasher} from "multiformats/hashes/sha2";
 
 describe("resolver", () => {
   it("parse a unixfs path", () => {
@@ -67,5 +81,75 @@ describe("resolver", () => {
       "12D3KooWCYiNWNDoprcW74NVCEKaMhSbrfMvY4JEMfWrV1JamSsA"
     );
     expect(multiaddrs[0].protos()[0].name).to.equal("ip4");
+  });
+
+  it("resolves a query", async () => {
+    const blocks = new MemoryBlockstore();
+
+    const account1 = {
+      balance: 300,
+      lastUpdated: "yesterday",
+    };
+    const account1Block = await encode({value: account1, codec, hasher});
+    await blocks.put(account1Block.cid, account1Block.bytes);
+
+    const account2 = {
+      balance: 100,
+      lastUpdated: "now",
+    };
+    const account2Block = await encode({value: account2, codec, hasher});
+    await blocks.put(account2Block.cid, account2Block.bytes);
+
+    const state = {
+      "0x01": account1Block.cid,
+      "0x02": account2Block.cid,
+    };
+    const stateBlock = await encode({value: state, codec, hasher});
+    await blocks.put(stateBlock.cid, stateBlock.bytes);
+
+    const msg = {
+      from: "0x01",
+      to: "0x02",
+      amount: 100,
+    };
+    const msgBlock = await encode({value: msg, codec, hasher});
+    await blocks.put(msgBlock.cid, msgBlock.bytes);
+
+    const root = {
+      state: stateBlock.cid,
+      epoch: Date.now(),
+      messages: [msgBlock.cid],
+    };
+    const rootBlock = await encode({value: root, codec, hasher});
+    await blocks.put(rootBlock.cid, rootBlock.bytes);
+
+    const selector = sb.exploreFields({
+      state: sb.exploreFields({
+        "0x02": sb.exploreFields({
+          balance: sb.match(),
+          lastUpdated: sb.match(),
+        }),
+      }),
+      messages: sb.exploreIndex(
+        0,
+        sb.exploreFields({
+          amount: sb.match(),
+        })
+      ),
+    });
+    const sel = parseContext().parseSelector(selector);
+    const ls = new LinkSystem(blocks);
+
+    const result = await resolveQuery(new BasicNode(root), sel, ls);
+
+    expect(result).to.deep.equal({
+      state: {
+        "0x02": {
+          balance: 100,
+          lastUpdated: "now",
+        },
+      },
+      messages: [{amount: 100}],
+    });
   });
 });
