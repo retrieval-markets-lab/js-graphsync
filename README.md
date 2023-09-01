@@ -23,7 +23,7 @@ It is recommended to use with the [WebTransport](https://github.com/libp2p/js-li
 
 ```ts
 import {createLibp2p} from "libp2p";
-import {Noise} from "@chainsafe/libp2p-noise";
+import {noise} from "@chainsafe/libp2p-noise";
 import {webTransport} from "@libp2p/webtransport";
 import {MemoryBlockstore} from "blockstore-core/memory";
 import {GraphSync, unixfsPathSelector, getPeer} from "@dcdn/graphsync";
@@ -32,7 +32,7 @@ const blocks = new MemoryBlockstore();
 
 const libp2p = await createLibp2p({
   transports: [webTransport()],
-  connectionEncryption: [() => new Noise()],
+  connectionEncryption: [noise()],
 });
 await libp2p.start();
     
